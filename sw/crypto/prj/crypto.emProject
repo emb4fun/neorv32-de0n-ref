@@ -1,0 +1,142 @@
+<!DOCTYPE CrossStudio_Project_File>
+<solution Name="crypto" target="20" version="2">
+  <configuration Name="Debug" hidden="Yes" />
+  <configuration Name="Release" hidden="Yes" />
+  <configuration Name="SDRAM" hidden="Yes" />
+  <configuration Name="SDRAM Debug" inherited_configurations="SDRAM;Debug" />
+  <configuration
+    Name="SDRAM Release"
+    inherited_configurations="SDRAM;Release" />
+  <project Name="crypto">
+    <configuration
+      Name="Common"
+      RISCV_TOOLCHAIN_VARIANT="Standard"
+      arm_compiler_variant="gcc"
+      arm_linker_no_warn_on_rwx_segments="Yes"
+      arm_linker_variant="GNU"
+      arm_rtl_variant="SEGGER"
+      build_generic_options_file_name=""
+      build_intermediate_directory="$(Configuration)"
+      build_output_directory="$(Configuration)"
+      c_preprocessor_definitions="INITIALIZE_STACK;__ARCH_RISCV__;RTOS_TCTS;USE_BOARD_DE0N"
+      c_user_include_directories="..\\..\\..\\hw\\src\\neorv32\\sw\\lib\\include;..\\library\\tcts\\inc;..\\library\\tal_de0n\\board\\de0n\\inc;..\\library\\tal_de0n\\core\\inc;..\\library\\tal_de0n\\cpu\\riscv\\neorv32\\inc;..\\library\\mbedtls\\include;..\\inc"
+      debug_register_definition_file="$(ProjectDir)/../../hw/src/neorv32/sw/svd/neorv32.svd"
+      debug_target_connection="J-Link"
+      heap_size="256"
+      linker_memory_map_file="$(ProjectDir)/neorv32_MemoryMap.xml"
+      linker_printf_fmt_level="long"
+      linker_printf_fp_enabled="Float"
+      linker_printf_width_precision_supported="Yes"
+      linker_section_placement_file="$(ProjectDir)/tcm_placement_riscv.xml"
+      linker_section_placements_segments=""
+      project_directory=""
+      project_type="Executable"
+      rv_abi="ilp32"
+      rv_architecture="rv32imc"
+      rv_debug_extensions="None"
+      rv_toolchain_prefix=""
+      stack_size="1024"
+      target_device_name="RV32"
+      target_reset_script="Reset()"
+      target_script_file="$(ProjectDir)/neorv32_Target.js" />
+    <configuration Name="Debug" c_preprocessor_definitions="__DEBUG__" />
+    <configuration
+      Name="Release"
+      c_preprocessor_definitions="__RELEASE__"
+      gcc_optimization_level="Level 3 for more speed"
+      link_time_optimization="Yes" />
+    <configuration
+      Name="SDRAM"
+      c_preprocessor_definitions="__SDRAM__"
+      linker_section_placement_file="$(ProjectDir)/sdram_placement_riscv.xml" />
+    <folder Name="Source Files">
+      <configuration Name="Common" filter="c;cpp;cxx;cc;h;s;asm;inc" />
+      <folder Name="library">
+        <folder Name="mbedtls">
+          <file file_name="../library/mbedtls/library/aes.c" />
+          <file file_name="../library/mbedtls/library/asn1parse.c" />
+          <file file_name="../library/mbedtls/library/asn1write.c" />
+          <file file_name="../library/mbedtls/library/base64.c" />
+          <file file_name="../library/mbedtls/library/bignum.c" />
+          <file file_name="../library/mbedtls/library/cipher.c" />
+          <file file_name="../library/mbedtls/library/cipher_wrap.c" />
+          <file file_name="../library/mbedtls/library/constant_time.c" />
+          <file file_name="../library/mbedtls/library/ctr_drbg.c" />
+          <file file_name="../library/mbedtls/library/ecdsa.c" />
+          <file file_name="../library/mbedtls/library/ecp.c" />
+          <file file_name="../library/mbedtls/library/ecp_curves.c" />
+          <file file_name="../library/mbedtls/library/entropy.c" />
+          <file file_name="../library/mbedtls/library/hmac_drbg.c" />
+          <file file_name="../library/mbedtls/library/md.c" />
+          <file file_name="../library/mbedtls/library/md5.c" />
+          <file file_name="../library/mbedtls/library/nist_kw.c" />
+          <file file_name="../library/mbedtls/library/oid.c" />
+          <file file_name="../library/mbedtls/library/pem.c" />
+          <file file_name="../library/mbedtls/library/pk.c" />
+          <file file_name="../library/mbedtls/library/pk_wrap.c" />
+          <file file_name="../library/mbedtls/library/pkparse.c" />
+          <file file_name="../library/mbedtls/library/pkwrite.c" />
+          <file file_name="../library/mbedtls/library/platform.c" />
+          <file file_name="../library/mbedtls/library/platform_util.c" />
+          <file file_name="../library/mbedtls/library/ripemd160.c" />
+          <file file_name="../library/mbedtls/library/rsa.c" />
+          <file file_name="../library/mbedtls/library/rsa_internal.c" />
+          <file file_name="../library/mbedtls/library/sha1.c" />
+          <file file_name="../library/mbedtls/library/sha256.c" />
+          <file file_name="../library/mbedtls/library/sha512.c" />
+          <file file_name="../library/mbedtls/library/x509.c" />
+        </folder>
+        <folder Name="neorv32">
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_cfs.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_cpu.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_cpu_cfu.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_gpio.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_gptmr.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_mtime.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_neoled.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_onewire.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_pwm.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_rte.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_spi.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_trng.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_twi.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_uart.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_wdt.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_xip.c" />
+          <file file_name="../../../hw/src/neorv32/sw/lib/source/neorv32_xirq.c" />
+        </folder>
+        <folder Name="tal">
+          <folder Name="board">
+            <file file_name="../library/tal_de0n/board/de0n/src/talboard.c" />
+            <file file_name="../library/tal_de0n/board/de0n/src/talgpio.c" />
+            <file file_name="../library/tal_de0n/board/de0n/src/talled.c" />
+          </folder>
+          <folder Name="core">
+            <file file_name="../library/tal_de0n/core/src/tal.c" />
+            <file file_name="../library/tal_de0n/core/src/talcom.c" />
+            <file file_name="../library/tal_de0n/core/src/taldebug.c" />
+            <file file_name="../library/tal_de0n/core/src/talmem.c" />
+            <file file_name="../library/tal_de0n/core/src/talmisc.c" />
+          </folder>
+          <folder Name="cpu">
+            <file file_name="../library/tal_de0n/cpu/riscv/neorv32/src/talcpu.c" />
+            <file file_name="../library/tal_de0n/cpu/riscv/neorv32/src/talcpu_com.c" />
+          </folder>
+        </folder>
+        <folder Name="tcts">
+          <file file_name="../library/tcts/src/tcts.c" />
+        </folder>
+      </folder>
+      <folder Name="src">
+        <file file_name="../src/ecdsa_test.c" />
+        <file file_name="../src/hash_test.c" />
+        <file file_name="../src/main.c" />
+        <file file_name="../src/terminal.c" />
+        <file file_name="../src/xmempool.c" />
+      </folder>
+    </folder>
+    <folder Name="System Files">
+      <file file_name="riscv_crt0.s" />
+    </folder>
+  </project>
+</solution>

@@ -1,0 +1,872 @@
+<<<
+:sectnums:
+=== Control and Status Registers (CSRs)
+
+The following table shows a summary of all available NEORV32 CSRs. The address field defines the CSR address for
+the CSR access instructions. The *[ASM]* name can be used for (inline) assembly code and is directly
+understood by the assembler/compiler. The *[C]* names are defined by the NEORV32 core library and can be
+used as immediate in plain C code. The *R/W* column shows whether the CSR can be read and/or written.
+
+.CSRs that are not Implemented
+[IMPORTANT]
+All CSR bits that are unused / not implemented / not shown are _hardwired to zero_. All CSRs that are not
+implemented, not supported or disabled will raise an illegal instruction exception when being accessed.
+
+.WARL Behavior
+[IMPORTANT]
+All writable CSRs provide **WARL** behavior (write all values; read only legal values). Application software
+should always read back a CSR after writing to check if the targeted bits can actually be modified (or are
+just read-only).
+
+.NEORV32 Control and Status Registers (CSRs)
+[cols="<2,<4,<5,^1,<11"]
+[options="header"]
+|=======================
+| Address | Name [ASM]                          | Name [C]             | R/W | Function
+5+^| **<<_floating_point_csrs>>**
+| 0x001   | <<_fflags>>                         | _CSR_FFLAGS_         | r/w | Floating-point accrued exceptions
+| 0x002   | <<_frm>>                            | _CSR_FRM_            | r/w | Floating-point dynamic rounding mode
+| 0x003   | <<_fcsr>>                           | _CSR_FCSR_           | r/w | Floating-point control and status (`frm` + `fflags`)
+5+^| **<<_machine_configuration_csrs>>**
+| 0x30A   | <<_menvcfg>>                        | _CSR_MENVCFG_        | r/- | Machine environment configuration register - low word
+| 0x31A   | <<_menvcfgh>>                       | _CSR_MENVCFGH_       | r/- | Machine environment configuration register - low word
+5+^| **<<_machine_trap_setup_csrs>>**
+| 0x300   | <<_mstatus>>                        | _CSR_MSTATUS_        | r/w | Machine status register - low word
+| 0x301   | <<_misa>>                           | _CSR_MISA_           | r/- | Machine CPU ISA and extensions
+| 0x304   | <<_mie>>                            | _CSR_MIE_            | r/w | Machine interrupt enable register
+| 0x305   | <<_mtvec>>                          | _CSR_MTVEC_          | r/w | Machine trap-handler base address for ALL traps
+| 0x306   | <<_mcounteren>>                     | _CSR_MCOUNTEREN_     | r/- | Machine counter-enable register
+| 0x310   | <<_mstatush>>                       | _CSR_MSTATUSH_       | r/- | Machine status register - high word
+5+^| **<<_machine_trap_handling_csrs>>**
+| 0x340   | <<_mscratch>>                       | _CSR_MSCRATCH_       | r/w | Machine scratch register
+| 0x341   | <<_mepc>>                           | _CSR_MEPC_           | r/w | Machine exception program counter
+| 0x342   | <<_mcause>>                         | _CSR_MCAUSE_         | r/w | Machine trap cause
+| 0x343   | <<_mtval>>                          | _CSR_MTVAL_          | r/w | Machine bad address or instruction
+| 0x344   | <<_mip>>                            | _CSR_MIP_            | r/w | Machine interrupt pending register
+5+^| **<<_machine_physical_memory_protection_csrs>>**
+| 0x3A0 .. 0x3A3 | <<_pmpcfg, `pmpcfg0`>> .. <<_pmpcfg, `pmpcfg3`>>      | _CSR_PMPCFG0_ .. _CSR_PMPCFG3_    | r/w | Physical memory protection configuration for region 0..15
+| 0x3B0 .. 0x3BF | <<_pmpaddr, `pmpaddr0`>> .. <<_pmpaddr, `pmpaddr15`>> | _CSR_PMPADDR0_ .. _CSR_PMPADDR15_ | r/w | Physical memory protection address register region 0..15
+5+^| **<<_trigger_module_csrs>>**
+| 0x7A0   | <<_tselect>>                        | _CSR_TSELECT_        | r/w | Trigger select register
+| 0x7A1   | <<_tdata1>>                         | _CSR_TDATA1_         | r/w | Trigger data register 1
+| 0x7A2   | <<_tdata2>>                         | _CSR_TDATA2_         | r/w | Trigger data register 2
+| 0x7A3   | <<_tdata3>>                         | _CSR_TDATA3_         | r/w | Trigger data register 3
+| 0x7A4   | <<_tinfo>>                          | _CSR_TINFO_          | r/w | Trigger information register
+| 0x7A5   | <<_tcontrol>>                       | _CSR_TCONTROL_       | r/w | Trigger control register
+| 0x7A8   | <<_mcontext>>                       | _CSR_MCONTEXT_       | r/w | Machine context register
+| 0x7AA   | <<_scontext>>                       | _CSR_SCONTEXT_       | r/w | Supervisor context register
+5+^| **<<_cpu_debug_mode_csrs>>**
+| 0x7B0   | <<_dcsr>>                           | -                    | r/w | Debug control and status register
+| 0x7B1   | <<_dpc>>                            | -                    | r/w | Debug program counter
+| 0x7B2   | <<_dscratch0>>                      | -                    | r/w | Debug scratch register 0
+5+^| **<<_machine_counter_and_timer_csrs>>**
+| 0xB00   | <<_mcycleh, `mcycle`>>              | _CSR_MCYCLE_         | r/w | Machine cycle counter low word
+| 0xB02   | <<_minstreth, `minstret`>>          | _CSR_MINSTRET_       | r/w | Machine instruction-retired counter low word
+| 0xB80   | <<_mcycleh, `mcycleh`>>             | _CSR_MCYCLEH_        | r/w | Machine cycle counter high word
+| 0xB82   | <<_minstreth, `minstreth`>>         | _CSR_MINSTRETH_      | r/w | Machine instruction-retired counter high word
+| 0xC00   | <<_cycleh, `cycle`>>                | _CSR_CYCLE_          | r/- | Cycle counter low word
+| 0xC02   | <<_instreth, `instret`>>            | _CSR_INSTRET_        | r/- | Instruction-retired counter low word
+| 0xC80   | <<_cycleh, `cycleh`>>               | _CSR_CYCLEH_         | r/- | Cycle counter high word
+| 0xC82   | <<_instreth, `instreth`>>           | _CSR_INSTRETH_       | r/- | Instruction-retired counter high word
+5+^| **<<_hardware_performance_monitors_hpm_csrs>>**
+| 0x323 .. 0x33F | <<_mhpmevent, `mhpmevent3`>> .. <<_mhpmevent, `mhpmevent31`>>             | _CSR_MHPMEVENT3_ .. _CSR_MHPMEVENT31_      | r/w | Machine performance-monitoring event select for counter 3..31
+| 0xB03 .. 0xB1F | <<_mhpmcounterh, `mhpmcounter3`>> .. <<_mhpmcounterh, `mhpmcounter31`>>   | _CSR_MHPMCOUNTER3_ .. _CSR_MHPMCOUNTER3H_  | r/w | Machine performance-monitoring counter 3..31 low word
+| 0xB83 .. 0xB9F | <<_mhpmcounterh, `mhpmcounter3h`>> .. <<_mhpmcounterh, `mhpmcounter31h`>> | _CSR_MHPMCOUNTER3H_ .. _CSR_MHPMCOUNTER31H_| r/w | Machine performance-monitoring counter 3..31 high word
+| 0xC03 .. 0xC1F | <<_hpmcounterh, `hpmcounter3`>> .. <<_hpmcounterh, `hpmcounter31`>>       | _CSR_HPMCOUNTER3_  .. _CSR_HPMCOUNTER3H_   | r/- | User performance-monitoring counter 3..31 low word
+| 0xC83 .. 0xC9F | <<_hpmcounterh, `hpmcounter3h`>> .. <<_hpmcounterh, `hpmcounter31h`>>     | _CSR_HPMCOUNTER3H_ .. _CSR_HPMCOUNTER31H_  | r/- | User performance-monitoring counter 3..31 high word
+5+^| **<<_machine_counter_setup_csrs>>**
+| 0x320   | <<_mcountinhibit>>                  | _CSR_MCOUNTINHIBIT_  | r/w | Machine counter-enable register
+5+^| **<<_machine_information_csrs>>**
+| 0xF11   | <<_mvendorid>>                      | _CSR_MVENDORID_      | r/- | Machine vendor ID
+| 0xF12   | <<_marchid>>                        | _CSR_MARCHID_        | r/- | Machine architecture ID
+| 0xF13   | <<_mimpid>>                         | _CSR_MIMPID_         | r/- | Machine implementation ID / version
+| 0xF14   | <<_mhartid>>                        | _CSR_MHARTID_        | r/- | Machine thread ID
+| 0xF15   | <<_mconfigptr>>                     | _CSR_MCONFIGPTR_     | r/- | Machine configuration pointer register
+5+^| **<<_neorv32_specific_csrs>>**
+| 0xFC0   | <<_mxisa>>                          | _CSR_MXISA_          | r/- | NEORV32-specific "extended" machine CPU ISA and extensions
+|=======================
+
+[NOTE]
+The following CSR sections provide a "headline" for each CSRs. It shows the 12-bit CSR address, the register's ISA/assembly name,
+a short description, the reset value and all ISA extension(s) that are required for implementing the according CSR.
+
+
+<<<
+// ####################################################################################################################
+:sectnums:
+==== Floating-Point CSRs
+
+
+:sectnums!:
+===== **`fflags`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x001 | `fflags` - **Floating-point accrued exceptions** | `Zicsr` + `Zfinx`
+3+<| Reset value: `0x00000000`
+|=======================
+
+The `fflags` CSR gives access to the FPU status flags.
+
+[cols="^1,^1,<10"]
+[options="header",grid="rows"]
+|=======================
+| Bit  | R/W | Function
+| 31:5 | r/- | _reserved_, writes are ignored; reads always return 0
+| 4    | r/w | **NV**: invalid operation
+| 3    | r/w | **DZ**: division by zero
+| 2    | r/w | **OF**: overflow
+| 1    | r/w | **UF**: underflow
+| 0    | r/w | **NX**: inexact
+|=======================
+
+
+:sectnums!:
+===== **`frm`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x002 | `frm` - **Floating-point dynamic rounding mode** | `Zicsr` + `Zfinx`
+3+<| Reset value: `0x00000000`
+|=======================
+
+The `frm` CSR is used to configure the rounding mode of the FPU.
+
+[cols="^1,^1,<10"]
+[options="header",grid="rows"]
+|=======================
+| Bit  | R/W | Function
+| 31:3 | r/- | _reserved_, writes are ignored; reads always return 0
+| 2:0  | r/w | Rounding mode
+|=======================
+
+
+:sectnums!:
+===== **`fcsr`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x003 | `fcsr` - **Floating-point control and status register** | `Zicsr` + `Zfinx`
+3+<| Reset value: `0x00000000`
+|=======================
+
+The `fcsr` provides combined access to the <<_fflags>> and <<_frm>> flags.
+
+[cols="^1,^1,<10"]
+[options="header",grid="rows"]
+|=======================
+| Bit  | R/W | Function
+| 31:6 | r/- | _reserved_, writes are ignored; reads always return 0
+| 7:5  | r/w | Rounding mode (<<_frm>>)
+| 4:0  | r/w | Accrued exception flags (<<_fflags>>)
+|=======================
+
+
+<<<
+// ####################################################################################################################
+:sectnums:
+==== Machine Configuration CSRs
+
+:sectnums!:
+===== **`menvcfg`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x30a | `menvcfg` - **Machine environment configuration register** | `Zicsr` + `U`
+3+<| Reset value: `0x00000000`
+|=======================
+
+[NOTE]
+The features of this CSR are not implemented yet. The register is read-only and always returns zero.
+
+
+:sectnums!:
+===== **`menvcfgh`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x31a | `menvcfgh` - **Machine environment configuration register - high word** | `Zicsr` + `U`
+3+<| Reset value: `0x00000000`
+|=======================
+
+[NOTE]
+The features of this CSR are not implemented yet. The register is read-only and always returns zero.
+
+
+<<<
+// ####################################################################################################################
+:sectnums:
+==== Machine Trap Setup CSRs
+
+:sectnums!:
+===== **`mstatus`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x300 | `mstatus` - **Machine status register** | `Zicsr`
+3+<| Reset value: `0x00000000`
+|=======================
+
+The `mstatus` is used to configure general machine environment parameters.
+
+[cols="^1,^3,^1,<9"]
+[options="header",grid="rows"]
+|=======================
+| Bit   | Name [C] | R/W | Function
+| 21    | _CSR_MSTATUS_TW_   | r/w | **TW**: Trap on execution of `wfi` instruction in user mode when set; hardwired to zero if user-mode not implemented
+| 17    | _CSR_MSTATUS_MPRV_ | r/w | **MPRV**: Effective privilege level for load/stores in machine mode; use `MPP`'s as effective privilege level when set; hardwired to zero if user-mode not implemented
+| 12:11 | _CSR_MSTATUS_MPP_H_ : _CSR_MSTATUS_MPP_L_ | r/w | **MPP**: Previous machine privilege level, 11 = machine (M) level, 00 = user (U) level
+| 7     | _CSR_MSTATUS_MPIE_ | r/w | **MPIE**: Previous machine global interrupt enable flag state
+| 3     | _CSR_MSTATUS_MIE_  | r/w | **MIE**: Machine global interrupt enable flag
+|=======================
+
+[NOTE]
+If the core is in user-mode, machine-mode interrupts are globally **enabled** even if `mstatus.mie` is cleared:
+"Interrupts for higher-privilege modes, y>x, are always globally enabled regardless of the setting of the global yIE
+bit for the higher-privilege mode." - RISC-V ISA Spec.
+
+:sectnums!:
+===== **`misa`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x301 | `misa` - **ISA and extensions** | `Zicsr`
+3+<| Reset value: `DEFINED`
+|=======================
+
+The `misa` CSR provides information regarding the availability of baic RISC-V ISa extensions.
+
+[NOTE]
+The NEORV32 `misa` CSR is read-only. Hence, active CPU extensions are entirely defined by pre-synthesis configurations
+and cannot be switch on/off during runtime. For compatibility reasons any write access to this CSR is simply ignored and
+will _not_ cause an illegal instruction exception.
+
+[cols="^1,^3,^1,<9"]
+[options="header",grid="rows"]
+|=======================
+| Bit   | Name [C] | R/W | Function
+| 31:30 | _CSR_MISA_MXL_HI_EXT_ : _CSR_MISA_MXL_LO_EXT_ | r/- | **MXL**: 32-bit architecture indicator (always _01_)
+| 23    | _CSR_MISA_X_EXT_ | r/- | **X**: extension bit is always set to indicate custom non-standard extensions
+| 20    | _CSR_MISA_U_EXT_ | r/- | **U**: CPU extension (user mode) available, set when <<_cpu_extension_riscv_u>> enabled
+| 12    | _CSR_MISA_M_EXT_ | r/- | **M**: CPU extension (mul/div) available, set when <<_cpu_extension_riscv_m>> enabled
+| 8     | _CSR_MISA_I_EXT_ | r/- | **I**: CPU base ISA, cleared when <<_cpu_extension_riscv_e>> enabled
+| 4     | _CSR_MISA_E_EXT_ | r/- | **E**: CPU extension (embedded) available, set when <<_cpu_extension_riscv_e>> enabled
+| 2     | _CSR_MISA_C_EXT_ | r/- | **C**: CPU extension (compressed instruction) available, set when <<_cpu_extension_riscv_c>> enabled
+|=======================
+
+[TIP]
+Machine-mode software can discover available `Z*` _sub-extensions_ (like `Zicsr` or `Zfinx`) by checking the NEORV32-specific
+<<_mxisa>> CSR.
+
+
+:sectnums!:
+===== **`mie`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x304 | `mie` - **Machine interrupt-enable register** | `Zicsr`
+3+<| Reset value: `0x00000000`
+|=======================
+
+The `mie` CSR is used to enable/disable individual interrupt sources.
+
+[cols="^1,^3,^1,<9"]
+[options="header",grid="rows"]
+|=======================
+| Bit   | Name [C] | R/W | Function
+| 31:16 | _CSR_MIE_FIRQ15E_ : _CSR_MIE_FIRQ0E_ | r/w | Fast interrupt channel 15..0 enable
+| 11    | _CSR_MIE_MEIE_ | r/w | **MEIE**: Machine _external_ interrupt enable
+| 7     | _CSR_MIE_MTIE_ | r/w | **MTIE**: Machine _timer_ interrupt enable (from <<_machine_system_timer_mtime>>)
+| 3     | _CSR_MIE_MSIE_ | r/w | **MSIE**: Machine _software_ interrupt enable
+|=======================
+
+
+:sectnums!:
+===== **`mtvec`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x305 | `mtvec` - **Machine trap-handler base address** | `Zicsr`
+3+<| Reset value: `0x00000000`
+|=======================
+
+The `mtvec` CSR contain the address of the primary trap handler, which gets executed whenever an
+interrupt is triggered or an exception is raised.
+
+[cols="^1,^1,<10"]
+[options="header",grid="rows"]
+|=======================
+| Bit  | R/W | Function
+| 31:2 | r/w | **BASE**: 4-byte aligned base address of trap base handler
+| 1:0  | r/- | **MODE**: always zero; BASE defines entry for _all_ traps
+|=======================
+
+
+:sectnums!:
+===== **`mcounteren`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x306 | `mcounteren` - **Machine counter enable** | `Zicsr` + `U`
+3+<| Reset value: _see below_
+|=======================
+
+The `mcounteren` CSR is used to constrain user-level access to the CPU's counter CSRs.
+
+[cols="^1,^1,<9"]
+[options="header",grid="rows"]
+|=======================
+| Bit  | R/W | Function
+| 31:3 | r/- | **HPM** = all `1`: user-level code is **not** allowed to read HPM counters <<_hpm_num_cnts>>
+| 2    | r/- | **IR** = `1`: User-level code is allowed to read `cycle[h]` CSRs when set
+| 1    | r/- | **TM** = `0`: `time` CSRs not implemented, always zero
+| 0    | r/- | **CY** = `1`: User-level code is allowed to read `instret[h]` CSRs when set
+|=======================
+
+[NOTE]
+If User mode is not implemented this register is read-only and always return zero when read.
+
+[NOTE]
+This CSR is read-only. Any write access will be ignored and will not raise an illegal
+instruction exception.
+
+
+:sectnums!:
+===== **`mstatush`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x310 | `mstatush` - **Machine status register - high word** | `Zicsr`
+3+<| Reset value: `0x00000000`
+|=======================
+
+[NOTE]
+The features of this CSR are not implemented yet. The register is read-only and always returns zero.
+
+
+<<<
+// ####################################################################################################################
+:sectnums:
+==== Machine Trap Handling CSRs
+
+:sectnums!:
+===== **`mscratch`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x340 | `mscratch` - **Scratch register for machine trap handlers** | `Zicsr`
+3+<| Reset value: `DEFINED`
+|=======================
+
+The `mscratch` is a general machine-mode scratch register.
+
+
+:sectnums!:
+===== **`mepc`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x341 | `mepc` - **Machine exception program counter** | `Zicsr`
+3+<| Reset value: `0x00000000`
+|=======================
+
+The `mepc` CSR provides the instruction address where execution has stopped/failed when
+an instruction is triggered / an exception is raised.
+
+[TIP]
+See section <<_traps_exceptions_and_interrupts>> for more information.
+
+
+:sectnums!:
+===== **`mcause`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x342 | `mcause` - **Machine trap cause** | `Zicsr`
+3+<| Reset value: `0x00000000`
+|=======================
+
+The `mcause` CSRs shows the exact cause of a trap.
+
+[TIP]
+See section <<_traps_exceptions_and_interrupts>> for more information.
+
+[cols="^1,^1,<10"]
+[options="header",grid="rows"]
+|=======================
+| Bit  | R/W | Function
+| 31   | r/w | **Interrupt**: `1` if the trap is caused by an interrupt (`0` if the trap is caused by an exception)
+| 30:5 | r/- | _Reserved_, read as zero
+| 4:0  | r/w | **Exception code**: see <<_neorv32_trap_listing>>
+|=======================
+
+
+:sectnums!:
+===== **`mtval`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x343 | `mtval` - **Machine trap value register** | `Zicsr`
+3+<| Reset value: `0x00000000`
+|=======================
+
+The `mtval` CSR provides additional information why a trap was entered.
+
+[cols="^5,^5"]
+[options="header",grid="rows"]
+|=======================
+| Trap cause | `mtval` content
+| misaligned instruction fetch address or instruction fetch access fault | address of faulting instruction fetch
+| misaligned load address, load access fault, misaligned store address or store access fault | program counter (= address) of faulting instruction
+| everything else (including all interrupts) | 0x00000000 (all-zero)
+|=======================
+
+[NOTE]
+In case an invalid **compressed instruction** raised an illegal instruction exception, `mtval` will show the
+according de-compressed instruction word. To get the actually 16-bit instruction that caused the exception
+perform a memory load using the address stored in <<_mepc>>.
+
+[TIP]
+See section <<_traps_exceptions_and_interrupts>> for more information.
+
+
+:sectnums!:
+===== **`mip`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x344 | `mip` - **Machine interrupt pending** | `Zicsr`
+3+<| Reset value: `0x00000000`
+|=======================
+
+The `mip` CSR shows currently _pending_ machine-level interrupt requests. The bits for the standard RISC-V
+machine-level interrupts (`MEIP`, `MTIP`, `MSIP`) are read-only. Hence, these interrupts cannot be
+cleared/set using the `mip` register. These interrupts are cleared/acknowledged by mechanism that are
+specific for the interrupt-causing modules. the according interrupt-generating device.
+
+The upper 16 bits represent the status of the CPU's fast interrupt request lines (FIRQ). Once triggered, these
+bit have to be cleared manually by writing zero to the according `mip` bits (in the interrupt handler routine)
+to clear the current interrupt request.
+
+[cols="^1,^3,^1,<9"]
+[options="header",grid="rows"]
+|=======================
+| Bit | Name [C] | R/W | Function
+| 31:16 | _CSR_MIP_FIRQ15P_ : _CSR_MIP_FIRQ0P_ | r/c | **FIRQxP**: Fast interrupt channel 15..0 pending; has to be cleared manually by writing zero
+| 11    | _CSR_MIP_MEIP_                       | r/- | **MEIP**: Machine _external_ interrupt pending; _cleared by platform-defined mechanism_
+| 7     | _CSR_MIP_MTIP_                       | r/- | **MTIP**: Machine _timer_ interrupt pending; _cleared by platform-defined mechanism_
+| 3     | _CSR_MIP_MSIP_                       | r/- | **MSIP**: Machine _software_ interrupt pending; _cleared by platform-defined mechanism_
+|=======================
+
+.FIRQ Channel Mapping
+[TIP]
+See section <<_neorv32_specific_fast_interrupt_requests>> for the mapping of the FIRQ channels and the according
+interrupt-triggering processor module.
+
+
+<<<
+// ####################################################################################################################
+:sectnums:
+==== Machine Physical Memory Protection CSRs
+
+The available physical memory protection logic is configured via the <<_pmp_num_regions>> and
+<<_pmp_min_granularity>> top entity generics. <<_pmp_num_regions>> defines the number of implemented
+protection regions and thus, the implementation of the available _PMP entries_.
+See section <<_pmp_physical_memory_protection>> for more information.
+
+If trying to access an PMP-related CSR beyond <<_pmp_num_regions>> **no illegal instruction
+exception** is triggered. The according CSRs are read-only (writes are ignored) and always return zero.
+However, any access beyond `pmpcfg3` or `pmpaddr15`, which are the last physically implemented registers if
+<<_pmp_num_regions>> == 16, will raise an illegal instruction exception as these CSRs are not implemented at all.
+
+
+:sectnums!:
+===== **`pmpcfg`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x3a0 | `pmpcfg0` - **Physical memory protection configuration register (region 0-3)** | `Zicsr` + `PMP`
+3+<| ...
+|  0x3a3| `pmpcfg3` - **Physical memory protection configuration register (region 12-15)** | `Zicsr` + `PMP`
+3+<| Reset value: all `0x00000000`
+|=======================
+
+The `pmpcfg*` CSRs are used to configure the different PMP regions. Each region features an independent 8-bit array
+in these CSRs.
+
+[cols="^1,^2,^1,<11"]
+[options="header",grid="rows"]
+|=======================
+| Bit | Name [C] | R/W | Function
+| 7   | _PMPCFG_L_     | r/w | **L**: Lock bit, prevents further write accesses, also enforces access rights in machine-mode, can only be cleared by CPU reset
+| 6:5 | -              | r/- | _reserved_, read as zero
+| 4   | _PMPCFG_A_MSB_ | r/- .2+<| **A**: Mode configuration; only **OFF** (`00`) and **TOR** (`01`) modes are supported, any other value will map back to OFF/TOR
+as the MSB is hardwired to zero
+| 3   | _PMPCFG_A_LSB_ | r/w 
+| 2   | _PMPCFG_X_     | r/w | **X**: Execute permission
+| 1   | _PMPCFG_W_     | r/w | **W**: Write permission
+| 0   | _PMPCFG_R_     | r/w | **R**: Read permission
+|=======================
+
+[WARNING]
+Setting the lock bit `L` and setting TOR mode in `pmpcfg(i)` will also lock write access to `pmpaddr(i-1)`.
+See the RISC-V specs. for more information.
+
+
+:sectnums!:
+===== **`pmpaddr`**
+
+The `pmpaddr*` CSRs are used to configure the region's address boundaries.
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x3b0 | `pmpaddr0` - **Physical memory protection address registers (region 0)** | `Zicsr` + `PMP`
+3+<| ...
+| 0x3bf | `pmpaddr15` - **Physical memory protection address registers (region 15)** | `Zicsr` + `PMP`
+3+<| Reset value: all `0x00000000`
+|=======================
+
+.Physical Address Size
+[NOTE]
+The two MSBs of each `pmpaddr` are hardwired to zero (= bits 33:32 of the physical address).
+
+
+<<<
+// ####################################################################################################################
+:sectnums:
+==== (Machine) Counter and Timer CSRs
+
+.Counter Size
+[NOTE]
+When implemented (by enabling the `Zicntr` ISA extension) the standard CPU counters are always 64-bit wide (low-word + high-word).
+
+.Instruction Retired Counter Increment
+[NOTE]
+The `[m]instret[h]` counter always increments when a instruction enters the pipeline's execute stage no matter
+if this instruction is actually going to retire or if it causes an exception.
+
+
+:sectnums!:
+===== **`cycle[h]`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0xc00 | `cycle` - **Cycle counter - low word** | `Zicsr` + `Zicntr`
+| 0xc80 | `cycleh` - **Cycle counter - high word** | `Zicsr` + `Zicntr`
+3+<| Reset value: all `0x00000000`
+|=======================
+
+The `cycle[h]` are user-mode shadow copies of the according <<_mcycleh>> CSRs. The user-level
+counter are read-only. Any write access will raise an illegal instruction exception.
+
+
+:sectnums!:
+===== **`instret[h]`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0xc02 | `instret` - **Instructions-retired counter - low word** | `Zicsr` + `Zicntr`
+| 0xc82 | `instreth` - **Instructions-retired counter - high word** | `Zicsr` + `Zicntr`
+3+<| Reset value: all `0x00000000`
+|=======================
+
+The `instret[h]` are user-mode shadow copies of the according <<_minstreth>> CSRs. The user-level
+counter are read-only. Any write access will raise an illegal instruction exception.
+
+
+:sectnums!:
+===== **`mcycle[h]`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0xb00 | `mcycle` - **Machine cycle counter - low word** | `Zicsr` + `Zicntr`
+| 0xb80 | `mcycleh` - **Machine cycle counter - high word** | `Zicsr` + `Zicntr`
+3+<| Reset value: all `0x00000000`
+|=======================
+
+If not halted via the <<_mcountinhibit>> CSR the `cycle[h]` CSR will increment with every active CPU clock
+cycle (CPU not in sleep mode). These registers are read/write only for machine-mode software.
+
+
+:sectnums!:
+===== **`minstret[h]`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0xb02 | `minstret` - **Machine instructions-retired counter - low word** | `Zicsr` + `Zicntr`
+| 0xb82 | `minstreth` - **Machine instructions-retired counter - high word** | `Zicsr` + `Zicntr`
+3+<| Reset value: all `0x00000000`
+|=======================
+
+If not halted via the <<_mcountinhibit>> CSR the `minstret[h]` CSRs will increment with every retired instruction.
+These registers are read/write only for machine-mode software.
+
+
+
+<<<
+// ####################################################################################################################
+:sectnums:
+==== Hardware Performance Monitors (HPM) CSRs
+
+The actual number of implemented hardware performance monitors is configured via the <<_hpm_num_cnts>> top entity generic,
+Note that always all 28 HPM counter and configuration registers (`mhpmcounter*[h]` and `mhpmevent*`) are implemented, but
+only the actually configured ones are implemented as "real" physical registers - the remaining ones will be hardwired to zero.
+
+If trying to access an HPM-related CSR beyond <<_hpm_num_cnts>> **no illegal instruction exception is
+triggered**. These CSRs are read-only (writes are ignored) and always return zero.
+
+The total counter width of the HPMs can be configured before synthesis via the <<_hpm_cnt_width>> generic (0..64-bit).
+If <<_hpm_num_cnts>> is less than 64, all remaining MSB-aligned bits are hardwired to zero.
+
+
+:sectnums!:
+===== **`mhpmevent`**
+
+[cols="1,9,>2"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x232 | `mhpmevent3` - **Machine hardware performance monitor event select (counter 3)** | `Zicsr` + `Zihpm`
+3+<| ...
+| 0x33f | `mhpmevent31` - **Machine hardware performance monitor event select (counter 31)** | `Zicsr` + `Zihpm`
+3+<| Reset value: all `0x00000000`
+|=======================
+
+The value in these CSRs define the architectural events that cause an increment of the according `mhpmcounter*[h]` counter(s).
+All available events are listed in the table below. If more than one event is selected, the according counter will increment if _any_ of
+the enabled events is observed (logical OR). Note that the counter will only increment by 1 step per clock
+cycle even if more than one trigger event is observed.
+
+[cols="^1,^3,^1,<9"]
+[options="header",grid="rows"]
+|=======================
+| Bit   | Name [C]               | R/W | Event
+| 31:15 | -                      | r/- | _reserved_, writes are ignored, read always return zero
+| 14    | _HPMCNT_EVENT_ILLEGAL_ | r/w | illegal instruction exception
+| 13    | _HPMCNT_EVENT_TRAP_    | r/w | entered trap (synchronous exception or interrupt)
+| 12    | _HPMCNT_EVENT_TBRANCH_ | r/w | _taken_ conditional branch
+| 11    | _HPMCNT_EVENT_BRANCH_  | r/w | conditional branch (_taken_ or _not taken_)
+| 10    | _HPMCNT_EVENT_JUMP_    | r/w | unconditional jump
+| 9     | _HPMCNT_EVENT_WAIT_LS_ | r/w | load/store memory wait cycle: if more than 1 cycle memory latency or high bus traffic
+| 8     | _HPMCNT_EVENT_STORE_   | r/w | memory data store operation
+| 7     | _HPMCNT_EVENT_LOAD_    | r/w | memory data load operation
+| 6     | _HPMCNT_EVENT_WAIT_MC_ | r/w | multi-cycle ALU operation wait cycle (like iterative shift operation)
+| 5     | _HPMCNT_EVENT_WAIT_II_ | r/w | instruction issue pipeline wait cycle: if more than 1 cycle latency, pipelines flush (like taken branches) / cache miss or high bus traffic
+| 4     | _HPMCNT_EVENT_WAIT_IF_ | r/w | instruction fetch memory wait cycle: if more than 1 cycle memory latency, cache miss or high bus traffic
+| 3     | _HPMCNT_EVENT_CIR_     | r/w | retired compressed instruction
+| 2     | _HPMCNT_EVENT_IR_      | r/w | retired instruction (compressed or uncompressed)
+| 1     | -                      | r/- | _not implemented, always read as zero_
+| 0     | _HPMCNT_EVENT_CY_      | r/w | active clock cycle (CPU not in sleep mode)
+|=======================
+
+
+:sectnums!:
+===== **`mhpmcounter[h]`**
+
+[cols="1,9,>2"]
+[frame="topbot",grid="none"]
+|=======================
+| 0xb03 | `mhpmcounter3` - **Machine hardware performance monitor - counter 3 low** | `Zicsr` + `Zihpm`
+3+<| ...
+| 0xb1f | `mhpmcounter31` - **Machine hardware performance monitor - counter 31 low** | `Zicsr` + `Zihpm`
+| 0xb83 | `mhpmcounter3h` - **Machine hardware performance monitor - counter 3 high** | `Zicsr` + `Zihpm`
+3+<| ...
+| 0xb9f | `mhpmcounter31h` - **Machine hardware performance monitor - counter 31 high** | `Zicsr` + `Zihpm`
+3+<| Reset value: all `0x00000000`
+|=======================
+
+If not halted via the <<_mcountinhibit>> CSR the `mhpmcounter*[h]` counter CSR increment whenever a configured
+event from the according <<_mhpmevent>> CSR occurs. The counter registers are read/write for machine mode and
+are not accessible for lower-privileged software.
+
+
+:sectnums!:
+===== **`hpmcounter[h]`**
+
+[cols="1,9,>2"]
+[frame="topbot",grid="none"]
+|=======================
+| 0xc03 | `hpmcounter3` - **User hardware performance monitor - counter 3 low** | `Zicsr` + `Zihpm`
+3+<| ...
+| 0xc1f | `hpmcounter31` - **User hardware performance monitor - counter 31 low** | `Zicsr` + `Zihpm`
+| 0xc83 | `hpmcounter3h` - **User hardware performance monitor - counter 3 high** | `Zicsr` + `Zihpm`
+3+<| ...
+| 0xc9f | `hpmcounter31h` - **User hardware performance monitor - counter 31 high** | `Zicsr` + `Zihpm`
+3+<| Reset value: all `0x00000000`
+|=======================
+
+The `hpmcounter*[h]` are user-level shadow copies of the according <<_mhpmcounterh>> CSRs. The user level
+counter CSRs are read-only. Any write access will raise an illegal instruction exception.
+
+
+<<<
+// ####################################################################################################################
+:sectnums:
+==== Machine Counter Setup CSRs
+
+:sectnums!:
+===== **`mcountinhibit`**
+
+The `mcountinhibit` CSR can be used to halt specific counter CSRs.
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x320 | `mcountinhibit` - **Machine counter-inhibit register** | `Zicsr`
+3+<| Reset value: `0x00000000`
+|=======================
+
+[cols="^1,^3,^1,<9"]
+[options="header",grid="rows"]
+|=======================
+| Bit  | Name [C] | R/W | Event
+| 3:31 | _CSR_MCOUNTINHIBIT_HPM3_ : _CSR_MCOUNTINHIBIT_HPM31_ | r/w | **HPMx**: Set to `1` to halt `[m]hpmcount*[h]`; hardwired to zero if `Zihpm` ISA extension is disabled
+| 2    | _CSR_MCOUNTINHIBIT_CY_ | r/w | **CY**: Set to `1` to halt `[m]cycle[h]`; hardwired to zero if `Zicntr` ISA extension is disabled
+| 0    | _CSR_MCOUNTINHIBIT_IR_ | r/w | **IR**: Set to `1` to halt `[m]instret[h]`; hardwired to zero if `Zicntr` ISA extension is disabled
+|=======================
+
+
+<<<
+// ####################################################################################################################
+:sectnums:
+==== Machine Information CSRs
+
+[NOTE]
+All machine information registers can only be accessed in machine mode and are read-only.
+
+:sectnums!:
+===== **`mvendorid`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0xf11 | `mvendorid` - **Machine vendor ID** | `Zicsr`
+3+<| Reset value: `0x00000000`
+|=======================
+
+[NOTE]
+The features of this CSR are not implemented yet. The register is read-only and always returns zero.
+
+
+:sectnums!:
+===== **`marchid`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0xf12 | `marchid` - **Machine architecture ID** | `Zicsr`
+3+<| Reset value: `0x00000013`
+|=======================
+
+The `marchid` CSR is read-only and provides the NEORV32 official RISC-V open-source architecture ID
+(decimal: 19, 32-bit hexadecimal: 0x00000013).
+
+
+:sectnums!:
+===== **`mimpid`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0xf13 | `mimpid` - **Machine implementation ID** | `Zicsr`
+3+<| Reset value: `DEFINED`
+|=======================
+
+The `mimpid` CSR is read-only and provides the version of the
+NEORV32 as BCD-coded number (example: `mimpid` = _0x01020312_ → 01.02.03.12 → version 1.2.3.12).
+
+
+:sectnums!:
+===== **`mhartid`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0xf14 | `mhartid` - **Machine hardware thread ID** | `Zicsr`
+3+<| Reset value: `DEFINED`
+|=======================
+
+The `mhartid` CSR is read-only and provides the core's hart ID,
+which is assigned via the <<_hw_thread_id>> top generic.
+
+
+:sectnums!:
+===== **`mconfigptr`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0xf15 | `mconfigptr` - **Machine configuration pointer register** | `zicsr`
+3+<| Reset value: `0x00000000`
+|=======================
+
+[NOTE]
+The features of this CSR are not implemented yet. The register is read-only and always returns zero.
+
+
+<<<
+// ####################################################################################################################
+:sectnums:
+==== NEORV32-Specific CSRs
+
+[NOTE]
+All NEORV32-specific CSRs are mapped to addresses that are explicitly reserved for custom **Machine-Mode, read-only** CSRs
+(assured by the RISC-V privileged specifications). Hence, these CSRs can only be accessed when in machine-mode. Any access
+outside of machine-mode will raise an illegal instruction exception.
+
+:sectnums!:
+===== **`mxisa`**
+
+[cols="1,8,>3"]
+[frame="topbot",grid="none"]
+|=======================
+| 0x7c0 | `mxisa` - **Machine EXTENDED ISA and Extensions register** | `Zicsr` + `X`
+3+<| Reset value: `DEFINED`
+|=======================
+
+The `mxisa` CSRs is a NEORV32-specific read-only CSR that helps machine-mode software to
+discover ISA sub-extensions and CPU configuration options.
+
+[cols="^1,^3,^1,<9"]
+[options="header",grid="rows"]
+|=======================
+| Bit   | Name [C] | R/W | Function
+| 31    | _CSR_MXISA_FASTSHIFT_ | r/- | fast shifts available when set (via top's <<_fast_shift_en>> generic)
+| 30    | _CSR_MXISA_FASTMUL_   | r/- | fast multiplication available when set (via top's <<_fast_mul_en>> generic)
+| 31:21 | -                     | r/- | _reserved_, read as zero
+| 20    | _CSR_MXISA_IS_SIM_    | r/- | set if CPU is being **simulated** (⚠️ not guaranteed)
+| 19:11 | -                     | r/- | _reserved_, read as zero
+| 11    | _CSR_MXISA_SDTRIG_    | r/- | `Sdtrig` extension (trigger module) available when set (via top's <<_cpu_extension_riscv_sdtrig>> generic)
+| 10    | _CSR_MXISA_SDEXT_     | r/- | `Sdext` extension (debug mode) available when set (via top's <<_cpu_extension_riscv_sdext>> generic)
+|  9    | _CSR_MXISA_ZIHPM_     | r/- | `Zihpm` (hardware performance monitors) extension available when set (via top's <<_cpu_extension_riscv_zihpm>> generic)
+|  8    | _CSR_MXISA_PMP_       | r/- | `PMP` (physical memory protection) extension available when set (via top's <<_pmp_num_regions>> generic)
+|  7    | _CSR_MXISA_ZICNTR_    | r/- | `Zicntr` extension (`I` sub-extension) available when set - `[m]cycle` and `[m]instret` CSRs available when set (via top's <<_cpu_extension_riscv_zicntr>> generic)
+|  6    | -                     | r/- | _reserved_, read as zero
+|  5    | _CSR_MXISA_ZFINX_     | r/- | `Zfinx` extension (`F` sub-/alternative-extension: FPU using `x` registers) available when set (via top's <<_cpu_extension_riscv_zfinx>> generic)
+|  4    | -                     | r/- | _reserved_, read as zero
+|  3    | _CSR_MXISA_ZXCFU_     | r/- | `Zxcfu` extension (custom functions unit for custom RISC-V instructions) available when set (via top's <<_cpu_extension_riscv_zxcfu>> generic)
+|  2    | _CSR_MXISA_ZMMUL_     | r/- | `Zmmul` extension (`M` sub-extension) available when set (via top's <<_cpu_extension_riscv_zmmul>> generic)
+|  1    | _CSR_MXISA_ZIFENCEI_  | r/- | `Zifencei` extension (`I` sub-extension) available when set (via top's <<_cpu_extension_riscv_zifencei>> generic)
+|  0    | _CSR_MXISA_ZICSR_     | r/- | `Zicsr` extension (`I` sub-extension) available when set (via top's <<_cpu_extension_riscv_zicsr>> generic)
+|=======================
