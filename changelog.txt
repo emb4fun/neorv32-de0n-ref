@@ -2,7 +2,7 @@
 * Project: neorv32-de0n-ref
 * Name   : "My reference design for a DE0-Nano board with a NEORV32"
 * Target : Terasic DE0-Nano Development and Education Board 
-* Version: 20230326
+* Version: 20230226
 ***************************************************************************
 * Tools  : Quartus II 15.0.2
 *          SEGGER Embedded Studio for RISC-V v7.10a
