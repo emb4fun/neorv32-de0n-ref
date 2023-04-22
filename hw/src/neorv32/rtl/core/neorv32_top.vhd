@@ -48,7 +48,8 @@ entity neorv32_top is
   generic (
     -- General --
     CLOCK_FREQUENCY              : natural;           -- clock frequency of clk_i in Hz
-    HW_THREAD_ID                 : natural := 0;      -- hardware thread id (32-bit)
+    HART_ID                      : std_ulogic_vector(31 downto 0) := x"00000000"; -- hardware thread ID
+    VENDOR_ID                    : std_ulogic_vector(31 downto 0) := x"00000000"; -- vendor's JEDEC ID
     CUSTOM_ID                    : std_ulogic_vector(31 downto 0) := x"00000000"; -- custom user-defined ID
     INT_BOOTLOADER_EN            : boolean := false;  -- boot configuration: true = boot explicit bootloader; false = boot from int/ext (I)MEM
 
@@ -62,8 +63,8 @@ entity neorv32_top is
     CPU_EXTENSION_RISCV_M        : boolean := false;  -- implement mul/div extension?
     CPU_EXTENSION_RISCV_U        : boolean := false;  -- implement user mode extension?
     CPU_EXTENSION_RISCV_Zfinx    : boolean := false;  -- implement 32-bit floating-point extension (using INT regs!)
-    CPU_EXTENSION_RISCV_Zicsr    : boolean := true;   -- implement CSR system?
     CPU_EXTENSION_RISCV_Zicntr   : boolean := true;   -- implement base counters?
+    CPU_EXTENSION_RISCV_Zicond   : boolean := false;  -- implement conditional operations extension?
     CPU_EXTENSION_RISCV_Zihpm    : boolean := false;  -- implement hardware performance monitors?
     CPU_EXTENSION_RISCV_Zifencei : boolean := false;  -- implement instruction stream sync.?
     CPU_EXTENSION_RISCV_Zmmul    : boolean := false;  -- implement multiply-only M sub-extension?
@@ -96,6 +97,11 @@ entity neorv32_top is
     ICACHE_BLOCK_SIZE            : natural := 64;     -- i-cache: block size in bytes (min 4), has to be a power of 2
     ICACHE_ASSOCIATIVITY         : natural := 1;      -- i-cache: associativity / number of sets (1=direct_mapped), has to be a power of 2
 
+    -- Internal Data Cache (dCACHE) --
+    DCACHE_EN                    : boolean := false;  -- implement data cache
+    DCACHE_NUM_BLOCKS            : natural := 4;      -- d-cache: number of blocks (min 1), has to be a power of 2
+    DCACHE_BLOCK_SIZE            : natural := 64;     -- d-cache: block size in bytes (min 4), has to be a power of 2
+
     -- External memory interface (WISHBONE) --
     MEM_EXT_EN                   : boolean := false;  -- implement external memory bus interface?
     MEM_EXT_TIMEOUT              : natural := 255;    -- cycles after a pending bus access auto-terminates (0 = disabled)
@@ -119,7 +125,9 @@ entity neorv32_top is
     IO_UART1_RX_FIFO             : natural := 1;      -- RX fifo depth, has to be a power of two, min 1
     IO_UART1_TX_FIFO             : natural := 1;      -- TX fifo depth, has to be a power of two, min 1
     IO_SPI_EN                    : boolean := false;  -- implement serial peripheral interface (SPI)?
-    IO_SPI_FIFO                  : natural := 0;      -- SPI RTX fifo depth, has to be zero or a power of two
+    IO_SPI_FIFO                  : natural := 1;      -- SPI RTX fifo depth, has to be a power of two, min 1
+    IO_SDI_EN                    : boolean := false;  -- implement serial data interface (SDI)?
+    IO_SDI_FIFO                  : natural := 0;      -- SDI RTX fifo depth, has to be zero or a power of two
     IO_TWI_EN                    : boolean := false;  -- implement two-wire interface (TWI)?
     IO_PWM_NUM_CH                : natural := 0;      -- number of PWM channels to implement (0..12); 0 = disabled
     IO_WDT_EN                    : boolean := false;  -- implement watch dog timer (WDT)?
@@ -127,10 +135,10 @@ entity neorv32_top is
     IO_TRNG_FIFO                 : natural := 1;      -- TRNG fifo depth, has to be a power of two, min 1
     IO_CFS_EN                    : boolean := false;  -- implement custom functions subsystem (CFS)?
     IO_CFS_CONFIG                : std_ulogic_vector(31 downto 0) := x"00000000"; -- custom CFS configuration generic
-    IO_CFS_IN_SIZE               : positive := 32;    -- size of CFS input conduit in bits
-    IO_CFS_OUT_SIZE              : positive := 32;    -- size of CFS output conduit in bits
+    IO_CFS_IN_SIZE               : natural := 32;     -- size of CFS input conduit in bits
+    IO_CFS_OUT_SIZE              : natural := 32;     -- size of CFS output conduit in bits
     IO_NEOLED_EN                 : boolean := false;  -- implement NeoPixel-compatible smart LED interface (NEOLED)?
-    IO_NEOLED_TX_FIFO            : natural := 1;      -- NEOLED TX FIFO depth, 1..32k, has to be a power of two
+    IO_NEOLED_TX_FIFO            : natural := 1;      -- NEOLED FIFO depth, has to be a power of two, min 1
     IO_GPTMR_EN                  : boolean := false;  -- implement general purpose timer (GPTMR)?
     IO_XIP_EN                    : boolean := false;  -- implement execute in place module (XIP)?
     IO_ONEWIRE_EN                : boolean := false   -- implement 1-wire interface (ONEWIRE)?
@@ -166,8 +174,8 @@ entity neorv32_top is
     -- XIP (execute in place via SPI) signals (available if IO_XIP_EN = true) --
     xip_csn_o      : out std_ulogic; -- chip-select, low-active
     xip_clk_o      : out std_ulogic; -- serial clock
-    xip_sdi_i      : in  std_ulogic := 'L'; -- device data input
-    xip_sdo_o      : out std_ulogic; -- controller data output
+    xip_dat_i      : in  std_ulogic := 'L'; -- device data input
+    xip_dat_o      : out std_ulogic; -- controller data output
 
     -- GPIO (available if IO_GPIO_NUM > 0) --
     gpio_o         : out std_ulogic_vector(63 downto 0); -- parallel output
@@ -176,27 +184,36 @@ entity neorv32_top is
     -- primary UART0 (available if IO_UART0_EN = true) --
     uart0_txd_o    : out std_ulogic; -- UART0 send data
     uart0_rxd_i    : in  std_ulogic := 'U'; -- UART0 receive data
-    uart0_rts_o    : out std_ulogic; -- hw flow control: UART0.RX ready to receive ("RTR"), low-active, optional
-    uart0_cts_i    : in  std_ulogic := 'L'; -- hw flow control: UART0.TX allowed to transmit, low-active, optional
+    uart0_rts_o    : out std_ulogic; -- HW flow control: UART0.RX ready to receive ("RTR"), low-active, optional
+    uart0_cts_i    : in  std_ulogic := 'L'; -- HW flow control: UART0.TX allowed to transmit, low-active, optional
 
     -- secondary UART1 (available if IO_UART1_EN = true) --
     uart1_txd_o    : out std_ulogic; -- UART1 send data
     uart1_rxd_i    : in  std_ulogic := 'U'; -- UART1 receive data
-    uart1_rts_o    : out std_ulogic; -- hw flow control: UART1.RX ready to receive ("RTR"), low-active, optional
-    uart1_cts_i    : in  std_ulogic := 'L'; -- hw flow control: UART1.TX allowed to transmit, low-active, optional
+    uart1_rts_o    : out std_ulogic; -- HW flow control: UART1.RX ready to receive ("RTR"), low-active, optional
+    uart1_cts_i    : in  std_ulogic := 'L'; -- HW flow control: UART1.TX allowed to transmit, low-active, optional
 
     -- SPI (available if IO_SPI_EN = true) --
-    spi_sck_o      : out std_ulogic; -- SPI serial clock
-    spi_sdo_o      : out std_ulogic; -- controller data out, peripheral data in
-    spi_sdi_i      : in  std_ulogic := 'U'; -- controller data in, peripheral data out
+    spi_clk_o      : out std_ulogic; -- SPI serial clock
+    spi_dat_o      : out std_ulogic; -- controller data out, peripheral data in
+    spi_dat_i      : in  std_ulogic := 'U'; -- controller data in, peripheral data out
     spi_csn_o      : out std_ulogic_vector(07 downto 0); -- chip-select
 
+    -- SDI (available if IO_SDI_EN = true) --
+    sdi_clk_i      : in  std_ulogic := 'U'; -- SDI serial clock
+    sdi_dat_o      : out std_ulogic; -- controller data out, peripheral data in
+    sdi_dat_i      : in  std_ulogic := 'U'; -- controller data in, peripheral data out
+    sdi_csn_i      : in  std_ulogic := 'H'; -- chip-select
+
     -- TWI (available if IO_TWI_EN = true) --
-    twi_sda_io     : inout std_logic; -- twi serial data line
-    twi_scl_io     : inout std_logic; -- twi serial clock line
+    twi_sda_i      : in  std_ulogic := 'H'; -- serial data line sense input
+    twi_sda_o      : out std_ulogic; -- serial data line output (pull low only)
+    twi_scl_i      : in  std_ulogic := 'H'; -- serial clock line sense input
+    twi_scl_o      : out std_ulogic; -- serial clock line output (pull low only)
 
     -- 1-Wire Interface (available if IO_ONEWIRE_EN = true) --
-    onewire_io     : inout std_logic; -- 1-wire bus
+    onewire_i      : in  std_ulogic := 'H'; -- 1-wire bus sense input
+    onewire_o      : out std_ulogic; -- 1-wire bus output (pull low only)
 
     -- PWM (available if IO_PWM_NUM_CH > 0) --
     pwm_o          : out std_ulogic_vector(11 downto 0); -- pwm channels
@@ -222,10 +239,6 @@ architecture neorv32_top_rtl of neorv32_top is
 
   -- CPU boot configuration --
   constant cpu_boot_addr_c : std_ulogic_vector(31 downto 0) := cond_sel_stdulogicvector_f(INT_BOOTLOADER_EN, boot_rom_base_c, ispace_base_c);
-
-  -- alignment check for internal memories --
-  constant imem_align_check_c : std_ulogic_vector(index_size_f(MEM_INT_IMEM_SIZE)-1 downto 0) := (others => '0');
-  constant dmem_align_check_c : std_ulogic_vector(index_size_f(MEM_INT_DMEM_SIZE)-1 downto 0) := (others => '0');
 
   -- reset generator --
   signal rstn_ext_sreg : std_ulogic_vector(3 downto 0);
@@ -260,22 +273,8 @@ architecture neorv32_top_rtl of neorv32_top is
   end record;
   signal cpu_s : cpu_status_t;
 
-  -- bus interface - instruction fetch --
-  type bus_i_interface_t is record
-    addr   : std_ulogic_vector(31 downto 0); -- bus access address
-    rdata  : std_ulogic_vector(31 downto 0); -- bus read data
-    re     : std_ulogic; -- read request
-    ack    : std_ulogic; -- bus transfer acknowledge
-    err    : std_ulogic; -- bus transfer error
-    fence  : std_ulogic; -- fence.i instruction executed
-    src    : std_ulogic; -- access source (1=instruction fetch, 0=data access)
-    cached : std_ulogic; -- cached transfer
-    priv   : std_ulogic; -- set when in privileged machine mode
-  end record;
-  signal cpu_i, i_cache : bus_i_interface_t;
-
-  -- bus interface - data access --
-  type bus_d_interface_t is record
+  -- bus interface --
+  type bus_interface_t is record
     addr   : std_ulogic_vector(31 downto 0); -- bus access address
     rdata  : std_ulogic_vector(31 downto 0); -- bus read data
     wdata  : std_ulogic_vector(31 downto 0); -- bus write data
@@ -284,12 +283,12 @@ architecture neorv32_top_rtl of neorv32_top is
     re     : std_ulogic; -- read request
     ack    : std_ulogic; -- bus transfer acknowledge
     err    : std_ulogic; -- bus transfer error
-    fence  : std_ulogic; -- fence instruction executed
     src    : std_ulogic; -- access source (1=instruction fetch, 0=data access)
     cached : std_ulogic; -- cached transfer
     priv   : std_ulogic; -- set when in privileged machine mode
   end record;
-  signal cpu_d, p_bus : bus_d_interface_t;
+  signal cpu_i, cpu_d, i_cache, d_cache, p_bus : bus_interface_t;
+  signal d_fence, i_fence : std_ulogic;
 
   -- bus access error (from BUSKEEPER) --
   signal bus_error : std_ulogic;
@@ -331,32 +330,28 @@ architecture neorv32_top_rtl of neorv32_top is
   type resp_bus_id_t is (RESP_BUSKEEPER, RESP_IMEM, RESP_DMEM, RESP_BOOTROM, RESP_WISHBONE, RESP_GPIO,
                          RESP_MTIME, RESP_UART0, RESP_UART1, RESP_SPI, RESP_TWI, RESP_PWM, RESP_WDT,
                          RESP_TRNG, RESP_CFS, RESP_NEOLED, RESP_SYSINFO, RESP_OCD, RESP_XIRQ, RESP_GPTMR,
-                         RESP_XIP_CT, RESP_XIP_ACC, RESP_ONEWIRE);
+                         RESP_XIP_CT, RESP_XIP_ACC, RESP_ONEWIRE, RESP_SDI);
 
   -- module response bus --
   type resp_bus_t is array (resp_bus_id_t) of resp_bus_entry_t;
   signal resp_bus : resp_bus_t := (others => resp_bus_entry_terminate_c);
 
   -- IRQs --
-  signal fast_irq      : std_ulogic_vector(15 downto 0);
-  signal mtime_irq     : std_ulogic;
-  signal wdt_irq       : std_ulogic;
-  signal uart0_rxd_irq : std_ulogic;
-  signal uart0_txd_irq : std_ulogic;
-  signal uart1_rxd_irq : std_ulogic;
-  signal uart1_txd_irq : std_ulogic;
-  signal spi_irq       : std_ulogic;
-  signal twi_irq       : std_ulogic;
-  signal cfs_irq       : std_ulogic;
-  signal neoled_irq    : std_ulogic;
-  signal xirq_irq      : std_ulogic;
-  signal gptmr_irq     : std_ulogic;
-  signal onewire_irq   : std_ulogic;
-
-  -- tri-state drivers --
-  signal twi_sda_i, twi_sda_o : std_ulogic;
-  signal twi_scl_i, twi_scl_o : std_ulogic;
-  signal onewire_i, onewire_o : std_ulogic;
+  signal fast_irq     : std_ulogic_vector(15 downto 0);
+  signal mtime_irq    : std_ulogic;
+  signal wdt_irq      : std_ulogic;
+  signal uart0_rx_irq : std_ulogic;
+  signal uart0_tx_irq : std_ulogic;
+  signal uart1_rx_irq : std_ulogic;
+  signal uart1_tx_irq : std_ulogic;
+  signal spi_irq      : std_ulogic;
+  signal sdi_irq      : std_ulogic;
+  signal twi_irq      : std_ulogic;
+  signal cfs_irq      : std_ulogic;
+  signal neoled_irq   : std_ulogic;
+  signal xirq_irq     : std_ulogic;
+  signal gptmr_irq    : std_ulogic;
+  signal onewire_irq  : std_ulogic;
 
   -- misc --
   signal ext_timeout : std_ulogic;
@@ -370,24 +365,33 @@ begin
   -- Processor IO/Peripherals Configuration -------------------------------------------------
   -- -------------------------------------------------------------------------------------------
   assert false report
-  "NEORV32 PROCESSOR CONFIG NOTE: Peripherals = " &
-  cond_sel_string_f(boolean(IO_GPIO_NUM > 0), "GPIO ", "") &
-  cond_sel_string_f(IO_MTIME_EN, "MTIME ", "") &
-  cond_sel_string_f(IO_UART0_EN, "UART0 ", "") &
-  cond_sel_string_f(IO_UART1_EN, "UART1 ", "") &
-  cond_sel_string_f(IO_SPI_EN, "SPI ", "") &
-  cond_sel_string_f(IO_TWI_EN, "TWI ", "") &
-  cond_sel_string_f(boolean(IO_PWM_NUM_CH > 0), "PWM ", "") &
-  cond_sel_string_f(IO_WDT_EN, "WDT ", "") &
-  cond_sel_string_f(IO_TRNG_EN, "TRNG ", "") &
-  cond_sel_string_f(IO_CFS_EN, "CFS ", "") &
-  cond_sel_string_f(IO_NEOLED_EN, "NEOLED ", "") &
-  cond_sel_string_f(boolean(XIRQ_NUM_CH > 0), "XIRQ ", "") &
-  cond_sel_string_f(IO_GPTMR_EN, "GPTMR ", "") &
-  cond_sel_string_f(IO_XIP_EN, "XIP ", "") &
-  cond_sel_string_f(IO_ONEWIRE_EN, "ONEWIRE ", "") &
-  ""
-  severity note;
+    "NEORV32 PROCESSOR CONFIGURATION: " &
+    cond_sel_string_f(MEM_INT_IMEM_EN, "IMEM ", "") &
+    cond_sel_string_f(MEM_INT_DMEM_EN, "DMEM ", "") &
+    cond_sel_string_f(INT_BOOTLOADER_EN, "BOOTROM ", "") &
+    cond_sel_string_f(ICACHE_EN, "I-CACHE ", "") &
+    cond_sel_string_f(DCACHE_EN, "D-CACHE ", "") &
+    cond_sel_string_f(MEM_EXT_EN, "WISHBONE ", "") &
+    cond_sel_string_f(ON_CHIP_DEBUGGER_EN, "OCD ", "") &
+    "- " &
+    cond_sel_string_f(boolean(IO_GPIO_NUM > 0), "GPIO ", "") &
+    cond_sel_string_f(IO_MTIME_EN, "MTIME ", "") &
+    cond_sel_string_f(IO_UART0_EN, "UART0 ", "") &
+    cond_sel_string_f(IO_UART1_EN, "UART1 ", "") &
+    cond_sel_string_f(IO_SPI_EN, "SPI ", "") &
+    cond_sel_string_f(IO_SDI_EN, "SDI ", "") &
+    cond_sel_string_f(IO_TWI_EN, "TWI ", "") &
+    cond_sel_string_f(boolean(IO_PWM_NUM_CH > 0), "PWM ", "") &
+    cond_sel_string_f(IO_WDT_EN, "WDT ", "") &
+    cond_sel_string_f(IO_TRNG_EN, "TRNG ", "") &
+    cond_sel_string_f(IO_CFS_EN, "CFS ", "") &
+    cond_sel_string_f(IO_NEOLED_EN, "NEOLED ", "") &
+    cond_sel_string_f(boolean(XIRQ_NUM_CH > 0), "XIRQ ", "") &
+    cond_sel_string_f(IO_GPTMR_EN, "GPTMR ", "") &
+    cond_sel_string_f(IO_XIP_EN, "XIP ", "") &
+    cond_sel_string_f(IO_ONEWIRE_EN, "ONEWIRE ", "") &
+    ""
+    severity note;
 
 
   -- Sanity Checks --------------------------------------------------------------------------
@@ -399,28 +403,8 @@ begin
     "NEORV32 PROCESSOR CONFIG NOTE: Boot configuration = direct boot from memory (processor-internal IMEM)." severity note;
   assert not ((INT_BOOTLOADER_EN = false) and (MEM_INT_IMEM_EN = false)) report
     "NEORV32 PROCESSOR CONFIG NOTE: Boot configuration = direct boot from memory (processor-external memory)." severity note;
-  --
-  assert not ((MEM_EXT_EN = false) and (MEM_INT_DMEM_EN = false)) report
-    "NEORV32 PROCESSOR CONFIG ERROR! Core cannot fetch data without external memory interface and internal IMEM." severity error;
-  assert not ((MEM_EXT_EN = false) and (MEM_INT_IMEM_EN = false) and (INT_BOOTLOADER_EN = false)) report
-    "NEORV32 PROCESSOR CONFIG ERROR! Core cannot fetch instructions without external memory interface, internal IMEM and bootloader." severity error;
-
-  -- memory size --
-  assert not ((MEM_INT_DMEM_EN = true) and (is_power_of_two_f(MEM_INT_IMEM_SIZE) = false)) report
-    "NEORV32 PROCESSOR CONFIG WARNING! MEM_INT_IMEM_SIZE should be a power of 2 to allow optimal hardware mapping." severity warning;
-  assert not ((MEM_INT_IMEM_EN = true) and (is_power_of_two_f(MEM_INT_DMEM_SIZE) = false)) report
-    "NEORV32 PROCESSOR CONFIG WARNING! MEM_INT_DMEM_SIZE should be a power of 2 to allow optimal hardware mapping." severity warning;
 
   -- memory layout --
-  assert not (ispace_base_c(1 downto 0) /= "00") report
-    "NEORV32 PROCESSOR CONFIG ERROR! Instruction memory space base address must be 32-bit-aligned." severity error;
-  assert not (dspace_base_c(1 downto 0) /= "00") report
-    "NEORV32 PROCESSOR CONFIG ERROR! Data memory space base address must be 32-bit-aligned." severity error;
-  assert not ((ispace_base_c(index_size_f(MEM_INT_IMEM_SIZE)-1 downto 0) /= imem_align_check_c) and (MEM_INT_IMEM_EN = true)) report
-    "NEORV32 PROCESSOR CONFIG ERROR! Instruction memory space base address has to be aligned to IMEM size." severity error;
-  assert not ((dspace_base_c(index_size_f(MEM_INT_DMEM_SIZE)-1 downto 0) /= dmem_align_check_c) and (MEM_INT_DMEM_EN = true)) report
-    "NEORV32 PROCESSOR CONFIG ERROR! Data memory space base address has to be aligned to DMEM size." severity error;
-  --
   assert not (ispace_base_c /= x"00000000") report
     "NEORV32 PROCESSOR CONFIG WARNING! Non-default base address for INSTRUCTION ADDRESS SPACE. Make sure this is sync with the software framework." severity warning;
   assert not (dspace_base_c /= x"80000000") report
@@ -430,15 +414,14 @@ begin
   assert not (ON_CHIP_DEBUGGER_EN = true) report
     "NEORV32 PROCESSOR CONFIG NOTE: Implementing on-chip debugger (OCD)." severity note;
 
-  -- instruction cache --
+  -- caches --
   assert not ((ICACHE_EN = true) and (CPU_EXTENSION_RISCV_Zifencei = false)) report
-    "NEORV32 CPU CONFIG WARNING! The <CPU_EXTENSION_RISCV_Zifencei> is required to perform i-cache memory sync operations." severity warning;
+    "NEORV32 CPU CONFIG WARNING! <CPU_EXTENSION_RISCV_Zifencei> ISA extension is required to perform i-cache memory sync operations." severity warning;
 
 
 -- ****************************************************************************************************************************
 -- Clock and Reset System
 -- ****************************************************************************************************************************
-
 
   -- Reset Generator ------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
@@ -512,13 +495,13 @@ begin
 -- CPU Core Complex
 -- ****************************************************************************************************************************
 
-
   -- CPU Core -------------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
   neorv32_cpu_inst: neorv32_cpu
   generic map (
     -- General --
-    HW_THREAD_ID                 => HW_THREAD_ID,                 -- hardware thread id
+    HART_ID                      => HART_ID,                      -- hardware thread ID
+    VENDOR_ID                    => VENDOR_ID,                    -- vendor's JEDEC ID
     CPU_BOOT_ADDR                => cpu_boot_addr_c,              -- cpu boot address
     CPU_DEBUG_PARK_ADDR          => dm_park_entry_c,              -- cpu debug mode parking loop entry address
     CPU_DEBUG_EXC_ADDR           => dm_exc_entry_c,               -- cpu debug mode exception entry address
@@ -529,8 +512,8 @@ begin
     CPU_EXTENSION_RISCV_M        => CPU_EXTENSION_RISCV_M,        -- implement mul/div extension?
     CPU_EXTENSION_RISCV_U        => CPU_EXTENSION_RISCV_U,        -- implement user mode extension?
     CPU_EXTENSION_RISCV_Zfinx    => CPU_EXTENSION_RISCV_Zfinx,    -- implement 32-bit floating-point extension (using INT reg!)
-    CPU_EXTENSION_RISCV_Zicsr    => CPU_EXTENSION_RISCV_Zicsr,    -- implement CSR system?
     CPU_EXTENSION_RISCV_Zicntr   => CPU_EXTENSION_RISCV_Zicntr,   -- implement base counters?
+    CPU_EXTENSION_RISCV_Zicond   => CPU_EXTENSION_RISCV_Zicond,   -- implement conditional operations extension?
     CPU_EXTENSION_RISCV_Zihpm    => CPU_EXTENSION_RISCV_Zihpm,    -- implement hardware performance monitors?
     CPU_EXTENSION_RISCV_Zifencei => CPU_EXTENSION_RISCV_Zifencei, -- implement instruction stream sync.?
     CPU_EXTENSION_RISCV_Zmmul    => CPU_EXTENSION_RISCV_Zmmul,    -- implement multiply-only M sub-extension?
@@ -561,7 +544,7 @@ begin
     i_bus_re_o    => cpu_i.re,    -- read request
     i_bus_ack_i   => cpu_i.ack,   -- bus transfer acknowledge
     i_bus_err_i   => cpu_i.err,   -- bus transfer error
-    i_bus_fence_o => cpu_i.fence, -- executed FENCEI operation
+    i_bus_fence_o => i_fence,     -- executed FENCEI operation
     i_bus_priv_o  => cpu_i.priv,  -- current effective privilege level
     -- data bus interface --
     d_bus_addr_o  => cpu_d.addr,  -- bus access address
@@ -572,45 +555,46 @@ begin
     d_bus_re_o    => cpu_d.re,    -- read request
     d_bus_ack_i   => cpu_d.ack,   -- bus transfer acknowledge
     d_bus_err_i   => cpu_d.err,   -- bus transfer error
-    d_bus_fence_o => cpu_d.fence, -- executed FENCE operation
+    d_bus_fence_o => d_fence,     -- executed FENCE operation
     d_bus_priv_o  => cpu_d.priv,  -- current effective privilege level
-    -- non-maskable interrupt --
-    msw_irq_i     => msw_irq_i,   -- machine software interrupt
-    mext_irq_i    => mext_irq_i,  -- machine external interrupt request
-    mtime_irq_i   => mtime_irq,   -- machine timer interrupt
-    -- fast interrupts (custom) --
-    firq_i        => fast_irq,    -- fast interrupt trigger
-    -- debug mode (halt) request --
-    db_halt_req_i => dci_halt_req
+    -- interrupts --
+    msw_irq_i     => msw_irq_i,   -- risc-v: machine software interrupt
+    mext_irq_i    => mext_irq_i,  -- risc-v: machine external interrupt
+    mtime_irq_i   => mtime_irq,   -- risc-v: machine timer interrupt
+    firq_i        => fast_irq,    -- custom: fast interrupts
+    db_halt_req_i => dci_halt_req -- risc-v: halt request (debug mode)
   );
 
-  -- misc --
-  cpu_i.src    <= '1'; -- initialized but unused
-  cpu_d.src    <= '0'; -- initialized but unused
-  cpu_i.cached <= '0'; -- initialized but unused
-  cpu_d.cached <= '0'; -- no data cache available yet
+  -- initialized but unused --
+  cpu_i.wdata  <= (others => '0');
+  cpu_i.ben    <= (others => '0');
+  cpu_i.we     <= '0'; -- read-only
+  cpu_i.src    <= '1'; -- 1 = instruction fetch
+  cpu_i.cached <= '0';
+  cpu_d.src    <= '0'; -- 0 = data access
+  cpu_d.cached <= '0';
 
   -- advanced memory control --
-  fence_o  <= cpu_d.fence; -- indicates an executed FENCE operation
-  fencei_o <= cpu_i.fence; -- indicates an executed FENCEI operation
+  fence_o  <= d_fence; -- indicates an executed FENCE operation
+  fencei_o <= i_fence; -- indicates an executed FENCE.I operation
 
   -- fast interrupt requests (FIRQs) - triggers are SINGLE-SHOT --
-  fast_irq(00) <= wdt_irq;       -- HIGHEST PRIORITY - watchdog
-  fast_irq(01) <= cfs_irq;       -- custom functions subsystem
-  fast_irq(02) <= uart0_rxd_irq; -- primary UART (UART0) RX
-  fast_irq(03) <= uart0_txd_irq; -- primary UART (UART0) TX
-  fast_irq(04) <= uart1_rxd_irq; -- secondary UART (UART1) RX
-  fast_irq(05) <= uart1_txd_irq; -- secondary UART (UART1) TX
-  fast_irq(06) <= spi_irq;       -- SPI transfer done
-  fast_irq(07) <= twi_irq;       -- TWI transfer done
-  fast_irq(08) <= xirq_irq;      -- external interrupt controller
-  fast_irq(09) <= neoled_irq;    -- NEOLED buffer IRQ
-  fast_irq(10) <= '0';           -- reserved
-  fast_irq(11) <= '0';           -- reserved
-  fast_irq(12) <= gptmr_irq;     -- general purpose timer match
-  fast_irq(13) <= onewire_irq;   -- ONEWIRE operation done
-  fast_irq(14) <= '0';           -- reserved
-  fast_irq(15) <= '0';           -- LOWEST PRIORITY - reserved
+  fast_irq(00) <= wdt_irq;      -- HIGHEST PRIORITY - watchdog
+  fast_irq(01) <= cfs_irq;      -- custom functions subsystem
+  fast_irq(02) <= uart0_rx_irq; -- primary UART (UART0) RX
+  fast_irq(03) <= uart0_tx_irq; -- primary UART (UART0) TX
+  fast_irq(04) <= uart1_rx_irq; -- secondary UART (UART1) RX
+  fast_irq(05) <= uart1_tx_irq; -- secondary UART (UART1) TX
+  fast_irq(06) <= spi_irq;      -- SPI interrupt
+  fast_irq(07) <= twi_irq;      -- TWI transfer done
+  fast_irq(08) <= xirq_irq;     -- external interrupt controller
+  fast_irq(09) <= neoled_irq;   -- NEOLED buffer IRQ
+  fast_irq(10) <= '0';          -- reserved
+  fast_irq(11) <= sdi_irq;      -- SDI interrupt
+  fast_irq(12) <= gptmr_irq;    -- general purpose timer match
+  fast_irq(13) <= onewire_irq;  -- ONEWIRE operation done
+  fast_irq(14) <= '0';          -- reserved
+  fast_irq(15) <= '0';          -- LOWEST PRIORITY - reserved
 
 
   -- CPU Instruction Cache ------------------------------------------------------------------
@@ -627,8 +611,7 @@ begin
       -- global control --
       clk_i        => clk_i,          -- global clock, rising edge
       rstn_i       => rstn_int,       -- global reset, low-active, async
-      clear_i      => cpu_i.fence,    -- cache clear
-      miss_o       => open,           -- cache miss
+      clear_i      => i_fence,        -- cache clear
       -- host controller interface --
       host_addr_i  => cpu_i.addr,     -- bus access address
       host_rdata_o => cpu_i.rdata,    -- bus read data
@@ -643,23 +626,77 @@ begin
       bus_ack_i    => i_cache.ack,    -- bus transfer acknowledge
       bus_err_i    => i_cache.err     -- bus transfer error
     );
-    i_cache.priv <= cpu_i.priv;
   end generate;
 
   neorv32_icache_inst_false:
   if (ICACHE_EN = false) generate
+    i_cache.cached <= '0'; -- single transfer (uncached)
     i_cache.addr   <= cpu_i.addr;
     cpu_i.rdata    <= i_cache.rdata;
     i_cache.re     <= cpu_i.re;
     cpu_i.ack      <= i_cache.ack;
     cpu_i.err      <= i_cache.err;
-    i_cache.cached <= '0'; -- single transfer (uncached)
-    i_cache.priv   <= cpu_i.priv;
   end generate;
 
-  -- yet unused --
-  i_cache.fence <= '0';
-  i_cache.src   <= '0';
+  i_cache.wdata <= (others => '0');
+  i_cache.ben   <= (others => '0');
+  i_cache.we    <= '0';
+  i_cache.priv  <= cpu_i.priv;
+  i_cache.src   <= '0'; -- not used
+
+
+  -- CPU Data Cache -------------------------------------------------------------------------
+  -- -------------------------------------------------------------------------------------------
+  neorv32_dcache_inst_true:
+  if (DCACHE_EN = true) generate
+    neorv32_dcache_inst: neorv32_dcache
+    generic map (
+      DCACHE_NUM_BLOCKS => DCACHE_NUM_BLOCKS, -- number of blocks (min 1), has to be a power of 2
+      DCACHE_BLOCK_SIZE => DCACHE_BLOCK_SIZE, -- block size in bytes (min 4), has to be a power of 2
+      DCACHE_UC_PBEGIN  => "1111"             -- begin of uncached address space (page number)
+    )
+    port map (
+      -- global control --
+      clk_i        => clk_i,          -- global clock, rising edge
+      rstn_i       => rstn_int,       -- global reset, low-active, async
+      clear_i      => d_fence,        -- cache clear
+      -- host controller interface --
+      host_addr_i  => cpu_d.addr,     -- bus access address
+      host_rdata_o => cpu_d.rdata,    -- bus read data
+      host_wdata_i => cpu_d.wdata,    -- bus write data
+      host_ben_i   => cpu_d.ben,      -- byte enable
+      host_we_i    => cpu_d.we,       -- write enable
+      host_re_i    => cpu_d.re,       -- read enable
+      host_ack_o   => cpu_d.ack,      -- bus transfer acknowledge
+      host_err_o   => cpu_d.err,      -- bus transfer error
+      -- peripheral bus interface --
+      bus_cached_o => d_cache.cached, -- set if cached (!) access in progress
+      bus_addr_o   => d_cache.addr,   -- bus access address
+      bus_rdata_i  => d_cache.rdata,  -- bus read data
+      bus_wdata_o  => d_cache.wdata,  -- bus write data
+      bus_ben_o    => d_cache.ben,    -- byte enable
+      bus_we_o     => d_cache.we,     -- write enable
+      bus_re_o     => d_cache.re,     -- read enable
+      bus_ack_i    => d_cache.ack,    -- bus transfer acknowledge
+      bus_err_i    => d_cache.err     -- bus transfer error
+    );
+  end generate;
+
+  neorv32_dcache_inst_false:
+  if (DCACHE_EN = false) generate
+    d_cache.cached <= '0'; -- single transfer (uncached)
+    d_cache.addr   <= cpu_d.addr;
+    cpu_d.rdata    <= d_cache.rdata;
+    d_cache.wdata  <= cpu_d.wdata;
+    d_cache.ben    <= cpu_d.ben;
+    d_cache.we     <= cpu_d.we;
+    d_cache.re     <= cpu_d.re;
+    cpu_d.ack      <= d_cache.ack;
+    cpu_d.err      <= d_cache.err;
+  end generate;
+
+  d_cache.priv <= cpu_d.priv;
+  d_cache.src  <= '0';
 
 
   -- CPU Bus Switch -------------------------------------------------------------------------
@@ -674,16 +711,16 @@ begin
     clk_i           => clk_i,          -- global clock, rising edge
     rstn_i          => rstn_int,       -- global reset, low-active, async
     -- controller interface a --
-    ca_bus_priv_i   => cpu_d.priv,     -- current privilege level
-    ca_bus_cached_i => cpu_d.cached,   -- set if cached transfer
-    ca_bus_addr_i   => cpu_d.addr,     -- bus access address
-    ca_bus_rdata_o  => cpu_d.rdata,    -- bus read data
-    ca_bus_wdata_i  => cpu_d.wdata,    -- bus write data
-    ca_bus_ben_i    => cpu_d.ben,      -- byte enable
-    ca_bus_we_i     => cpu_d.we,       -- write enable
-    ca_bus_re_i     => cpu_d.re,       -- read enable
-    ca_bus_ack_o    => cpu_d.ack,      -- bus transfer acknowledge
-    ca_bus_err_o    => cpu_d.err,      -- bus transfer error
+    ca_bus_priv_i   => d_cache.priv,   -- current privilege level
+    ca_bus_cached_i => d_cache.cached, -- set if cached transfer
+    ca_bus_addr_i   => d_cache.addr,   -- bus access address
+    ca_bus_rdata_o  => d_cache.rdata,  -- bus read data
+    ca_bus_wdata_i  => d_cache.wdata,  -- bus write data
+    ca_bus_ben_i    => d_cache.ben,    -- byte enable
+    ca_bus_we_i     => d_cache.we,     -- write enable
+    ca_bus_re_i     => d_cache.re,     -- read enable
+    ca_bus_ack_o    => d_cache.ack,    -- bus transfer acknowledge
+    ca_bus_err_o    => d_cache.err,    -- bus transfer error
     -- controller interface b --
     cb_bus_priv_i   => i_cache.priv,   -- current privilege level
     cb_bus_cached_i => i_cache.cached, -- set if cached transfer
@@ -709,28 +746,26 @@ begin
     p_bus_err_i     => bus_error       -- bus transfer error
   );
 
-  -- any fence operation? --
-  p_bus.fence <= cpu_i.fence or cpu_d.fence;
 
-  -- bus response --
+  -- Bus Response ---------------------------------------------------------------------------
+  -- -------------------------------------------------------------------------------------------
   bus_response: process(resp_bus)
     variable rdata_v : std_ulogic_vector(31 downto 0);
     variable ack_v   : std_ulogic;
     variable err_v   : std_ulogic;
   begin
+    -- OR all response signals: only the module that has actually been accessed may set its bus output signals
     rdata_v := (others => '0');
     ack_v   := '0';
     err_v   := '0';
-    -- OR all response signals: only the module that has actually
-    -- been accessed is allowed to *set* its bus output signals
     for i in resp_bus'range loop
       rdata_v := rdata_v or resp_bus(i).rdata; -- read data
       ack_v   := ack_v   or resp_bus(i).ack;   -- acknowledge
       err_v   := err_v   or resp_bus(i).err;   -- error
     end loop; -- i
-    p_bus.rdata <= rdata_v; -- processor bus: CPU transfer data input
-    p_bus.ack   <= ack_v;   -- processor bus: CPU transfer ACK input
-    p_bus.err   <= err_v;   -- processor bus: CPU transfer data bus error input
+    p_bus.rdata <= rdata_v;
+    p_bus.ack   <= ack_v;
+    p_bus.err   <= err_v;
   end process;
 
 
@@ -759,14 +794,13 @@ begin
     bus_xip_i  => xip_access                      -- pending XIP access
   );
 
-  -- unused, BUSKEEPER issues error to **directly** the CPU --
+  -- unused, BUSKEEPER issues error **directly** to the CPU --
   resp_bus(RESP_BUSKEEPER).err <= '0';
 
 
 -- ****************************************************************************************************************************
 -- Memory System
 -- ****************************************************************************************************************************
-
 
   -- Processor-Internal Instruction Memory (IMEM) -------------------------------------------
   -- -------------------------------------------------------------------------------------------
@@ -952,8 +986,8 @@ begin
       -- SPI device interface --
       spi_csn_o   => xip_csn_o,                    -- chip-select, low-active
       spi_clk_o   => xip_clk_o,                    -- serial clock
-      spi_data_i  => xip_sdi_i,                    -- device data output
-      spi_data_o  => xip_sdo_o                     -- controller data output
+      spi_dat_i   => xip_dat_i,                    -- device data output
+      spi_dat_o   => xip_dat_o                     -- controller data output
     );
     resp_bus(RESP_XIP_CT).err <= '0'; -- no access error possible
   end generate;
@@ -969,14 +1003,13 @@ begin
     xip_cg_en  <= '0';
     xip_csn_o  <= '1';
     xip_clk_o  <= '0';
-    xip_sdo_o  <= '0';
+    xip_dat_o  <= '0';
   end generate;
 
 
 -- ****************************************************************************************************************************
 -- IO/Peripheral Modules
 -- ****************************************************************************************************************************
-
 
   -- IO Access? -----------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
@@ -1025,6 +1058,44 @@ begin
     cfs_cg_en <= '0';
     cfs_irq   <= '0';
     cfs_out_o <= (others => '0');
+  end generate;
+
+
+  -- Serial Data Interface (SDI) ------------------------------------------------------------
+  -- -------------------------------------------------------------------------------------------
+  neorv32_sdi_inst_true:
+  if (IO_SDI_EN = true) generate
+    neorv32_SDI_inst: neorv32_sdi
+    generic map (
+      RTX_FIFO => IO_SDI_FIFO -- RTX fifo depth, has to be a power of two, min 1
+    )
+    port map (
+      -- host access --
+      clk_i     => clk_i,                    -- global clock line
+      rstn_i    => rstn_int,                 -- global reset line, low-active, async
+      addr_i    => p_bus.addr,               -- address
+      rden_i    => io_rden,                  -- read enable
+      wren_i    => io_wren,                  -- write enable
+      data_i    => p_bus.wdata,              -- data in
+      data_o    => resp_bus(RESP_SDI).rdata, -- data out
+      ack_o     => resp_bus(RESP_SDI).ack,   -- transfer acknowledge
+      -- SDI receiver input --
+      sdi_csn_i => sdi_csn_i,                -- low-active chip-select
+      sdi_clk_i => sdi_clk_i,                -- serial clock
+      sdi_dat_i => sdi_dat_i,                -- serial data input
+      sdi_dat_o => sdi_dat_o,                -- serial data output
+      -- interrupts --
+      irq_o     => sdi_irq
+    );
+    resp_bus(RESP_SDI).err <= '0'; -- no access error possible
+  end generate;
+
+  neorv32_sdi_inst_false:
+  if (IO_SDI_EN = false) generate
+    resp_bus(RESP_SDI) <= resp_bus_entry_terminate_c;
+    --
+    sdi_dat_o <= '0';
+    sdi_irq   <= '0';
   end generate;
 
 
@@ -1159,8 +1230,8 @@ begin
       uart_rts_o  => uart0_rts_o,                -- UART.RX ready to receive ("RTR"), low-active, optional
       uart_cts_i  => uart0_cts_i,                -- UART.TX allowed to transmit, low-active, optional
       -- interrupts --
-      irq_rxd_o   => uart0_rxd_irq,              -- uart data received interrupt
-      irq_txd_o   => uart0_txd_irq               -- uart transmission done interrupt
+      irq_rx_o    => uart0_rx_irq,               -- rx interrupt
+      irq_tx_o    => uart0_tx_irq                -- tx interrupt
     );
     resp_bus(RESP_UART0).err <= '0'; -- no access error possible
   end generate;
@@ -1169,11 +1240,11 @@ begin
   if (IO_UART0_EN = false) generate
     resp_bus(RESP_UART0) <= resp_bus_entry_terminate_c;
     --
-    uart0_txd_o   <= '0';
-    uart0_rts_o   <= '0';
-    uart0_cg_en   <= '0';
-    uart0_rxd_irq <= '0';
-    uart0_txd_irq <= '0';
+    uart0_txd_o  <= '0';
+    uart0_rts_o  <= '1';
+    uart0_cg_en  <= '0';
+    uart0_rx_irq <= '0';
+    uart0_tx_irq <= '0';
   end generate;
 
 
@@ -1207,8 +1278,8 @@ begin
       uart_rts_o  => uart1_rts_o,                -- UART.RX ready to receive ("RTR"), low-active, optional
       uart_cts_i  => uart1_cts_i,                -- UART.TX allowed to transmit, low-active, optional
       -- interrupts --
-      irq_rxd_o   => uart1_rxd_irq,              -- uart data received interrupt
-      irq_txd_o   => uart1_txd_irq               -- uart transmission done interrupt
+      irq_rx_o    => uart1_rx_irq,               -- rx interrupt
+      irq_tx_o    => uart1_tx_irq                -- tx interrupt
     );
     resp_bus(RESP_UART1).err <= '0'; -- no access error possible
   end generate;
@@ -1217,11 +1288,11 @@ begin
   if (IO_UART1_EN = false) generate
     resp_bus(RESP_UART1) <= resp_bus_entry_terminate_c;
     --
-    uart1_txd_o   <= '0';
-    uart1_rts_o   <= '0';
-    uart1_cg_en   <= '0';
-    uart1_rxd_irq <= '0';
-    uart1_txd_irq <= '0';
+    uart1_txd_o  <= '0';
+    uart1_rts_o  <= '1';
+    uart1_cg_en  <= '0';
+    uart1_rx_irq <= '0';
+    uart1_tx_irq <= '0';
   end generate;
 
 
@@ -1231,7 +1302,7 @@ begin
   if (IO_SPI_EN = true) generate
     neorv32_spi_inst: neorv32_spi
     generic map (
-      IO_SPI_FIFO => IO_SPI_FIFO -- SPI RTX fifo depth, has to be zero or a power of two
+      IO_SPI_FIFO => IO_SPI_FIFO -- SPI RTX fifo depth, has to be a power of two, min 1
     )
     port map (
       -- host access --
@@ -1247,9 +1318,9 @@ begin
       clkgen_en_o => spi_cg_en,                -- enable clock generator
       clkgen_i    => clk_gen,
       -- com lines --
-      spi_sck_o   => spi_sck_o,                -- SPI serial clock
-      spi_sdo_o   => spi_sdo_o,                -- controller data out, peripheral data in
-      spi_sdi_i   => spi_sdi_i,                -- controller data in, peripheral data out
+      spi_clk_o   => spi_clk_o,                -- SPI serial clock
+      spi_dat_o   => spi_dat_o,                -- controller data out, peripheral data in
+      spi_dat_i   => spi_dat_i,                -- controller data in, peripheral data out
       spi_csn_o   => spi_csn_o,                -- SPI CS
       -- interrupt --
       irq_o       => spi_irq                   -- transmission done interrupt
@@ -1261,8 +1332,8 @@ begin
   if (IO_SPI_EN = false) generate
     resp_bus(RESP_SPI) <= resp_bus_entry_terminate_c;
     --
-    spi_sck_o <= '0';
-    spi_sdo_o <= '0';
+    spi_clk_o <= '0';
+    spi_dat_o <= '0';
     spi_csn_o <= (others => '1'); -- CS lines are low-active
     spi_cg_en <= '0';
     spi_irq   <= '0';
@@ -1296,22 +1367,16 @@ begin
       irq_o       => twi_irq                   -- transfer done IRQ
     );
     resp_bus(RESP_TWI).err <= '0'; -- no access error possible
-
-    -- tri-state drivers --
-    twi_sda_io <= '0' when (twi_sda_o = '0') else 'Z'; -- module can only pull the line low actively
-    twi_scl_io <= '0' when (twi_scl_o = '0') else 'Z';
-    twi_sda_i  <= to_stdulogic(to_bit(twi_sda_io)); -- "to_bit" to avoid hardware-vs-simulation mismatch
-    twi_scl_i  <= to_stdulogic(to_bit(twi_scl_io));
   end generate;
 
   neorv32_twi_inst_false:
   if (IO_TWI_EN = false) generate
     resp_bus(RESP_TWI) <= resp_bus_entry_terminate_c;
     --
-    twi_sda_io <= 'Z';
-    twi_scl_io <= 'Z';
-    twi_cg_en  <= '0';
-    twi_irq    <= '0';
+    twi_sda_o <= '1';
+    twi_scl_o <= '1';
+    twi_cg_en <= '0';
+    twi_irq   <= '0';
   end generate;
 
 
@@ -1385,7 +1450,7 @@ begin
   if (IO_NEOLED_EN = true) generate
     neorv32_neoled_inst: neorv32_neoled
     generic map (
-      FIFO_DEPTH => IO_NEOLED_TX_FIFO -- TX FIFO depth (1..32k, power of two)
+      FIFO_DEPTH => IO_NEOLED_TX_FIFO -- NEOLED FIFO depth, has to be a power of two, min 1
     )
     port map (
       -- host access --
@@ -1512,17 +1577,13 @@ begin
       irq_o       => onewire_irq                   -- transfer done IRQ
     );
     resp_bus(RESP_ONEWIRE).err <= '0'; -- no access error possible
-
-    -- tri-state driver --
-    onewire_io <= '0' when (onewire_o = '0') else 'Z'; -- module can only pull the line low actively
-    onewire_i  <= to_stdulogic(to_bit(onewire_io)); -- "to_bit" to avoid hardware-vs-simulation mismatch
   end generate;
 
   neorv32_onewire_inst_false:
   if (IO_ONEWIRE_EN = false) generate
     resp_bus(RESP_ONEWIRE) <= resp_bus_entry_terminate_c;
     --
-    onewire_io    <= 'Z';
+    onewire_o     <= '1';
     onewire_cg_en <= '0';
     onewire_irq   <= '0';
   end generate;
@@ -1544,11 +1605,15 @@ begin
     -- Internal Data memory --
     MEM_INT_DMEM_EN      => MEM_INT_DMEM_EN,      -- implement processor-internal data memory
     MEM_INT_DMEM_SIZE    => MEM_INT_DMEM_SIZE,    -- size of processor-internal data memory in bytes
-    -- Internal Cache memory --
+    -- Instruction cache --
     ICACHE_EN            => ICACHE_EN,            -- implement instruction cache
     ICACHE_NUM_BLOCKS    => ICACHE_NUM_BLOCKS,    -- i-cache: number of blocks (min 2), has to be a power of 2
     ICACHE_BLOCK_SIZE    => ICACHE_BLOCK_SIZE,    -- i-cache: block size in bytes (min 4), has to be a power of 2
     ICACHE_ASSOCIATIVITY => ICACHE_ASSOCIATIVITY, -- i-cache: associativity (min 1), has to be a power 2
+    -- Data cache --
+    DCACHE_EN            => DCACHE_EN,            -- implement data cache
+    DCACHE_NUM_BLOCKS    => DCACHE_NUM_BLOCKS,    -- d-cache: number of blocks (min 2), has to be a power of 2
+    DCACHE_BLOCK_SIZE    => DCACHE_BLOCK_SIZE,    -- d-cache: block size in bytes (min 4), has to be a power of 2
     -- External memory interface --
     MEM_EXT_EN           => MEM_EXT_EN,           -- implement external memory bus interface?
     MEM_EXT_BIG_ENDIAN   => MEM_EXT_BIG_ENDIAN,   -- byte order: true=big-endian, false=little-endian
@@ -1560,6 +1625,7 @@ begin
     IO_UART0_EN          => IO_UART0_EN,          -- implement primary universal asynchronous receiver/transmitter (UART0)?
     IO_UART1_EN          => IO_UART1_EN,          -- implement secondary universal asynchronous receiver/transmitter (UART1)?
     IO_SPI_EN            => IO_SPI_EN,            -- implement serial peripheral interface (SPI)?
+    IO_SDI_EN            => IO_SDI_EN,            -- implement serial data interface (SDI)?
     IO_TWI_EN            => IO_TWI_EN,            -- implement two-wire interface (TWI)?
     IO_PWM_NUM_CH        => IO_PWM_NUM_CH,        -- number of PWM channels to implement
     IO_WDT_EN            => IO_WDT_EN,            -- implement watch dog timer (WDT)?
@@ -1627,9 +1693,9 @@ begin
     -- -------------------------------------------------------------------------------------------
     neorv32_debug_dtm_inst: neorv32_debug_dtm
     generic map (
-      IDCODE_VERSION => jtag_tap_idcode_version_c, -- version
-      IDCODE_PARTID  => jtag_tap_idcode_partid_c,  -- part number
-      IDCODE_MANID   => jtag_tap_idcode_manid_c    -- manufacturer id
+      IDCODE_VERSION => (others => '0'), -- version
+      IDCODE_PARTID  => (others => '0'), -- part number
+      IDCODE_MANID   => (others => '0')  -- manufacturer id
     )
     port map (
       -- global control --

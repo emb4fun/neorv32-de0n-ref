@@ -67,7 +67,7 @@ static void HardwareInit (void)
    
    neorv32_cpu_csr_write(CSR_MIE, 0); // no interrupt, thanks
    neorv32_rte_setup(); // capture all exceptions and give debug information, ho hw flow control
-   neorv32_uart0_setup(19200, PARITY_NONE, FLOW_CONTROL_NONE);
+   neorv32_uart0_setup(19200, 0);
    // check available hardware extensions and compare with compiler flags
    neorv32_rte_check_isa(0); // silent = 0 -> show message if isa mismatch
    
@@ -106,7 +106,7 @@ int main (void)
     */
    HardwareInit();
 
-   _printf("Processor running at %u Hz\n", (uint32_t)NEORV32_SYSINFO.CLK);
+   _printf("Processor running at %u Hz\n", (uint32_t)NEORV32_SYSINFO->CLK);
    _printf("Executing Dhrystone (%u iterations). This may take some time...\n", (uint32_t)NUMBER_OF_RUNS);
 
    /*
@@ -131,23 +131,5 @@ int main (void)
     */ 
    return(dSize); /*lint !e527*/
 } /* main */
-
-int neorv32_uart_available (volatile neorv32_uart_t *UARTx)
-{
-   int available = 0;
-   
-   if( ((int)UARTx == NEORV32_UART0_BASE) && (NEORV32_SYSINFO.SOC & (1 << SYSINFO_SOC_IO_UART0)) )
-   {
-      available = 1;
-   }
-   
-   if( ((int)UARTx == NEORV32_UART1_BASE) && (NEORV32_SYSINFO.SOC & (1 << SYSINFO_SOC_IO_UART1)) )
-   {
-      available = 1;
-   }
-   
-   return(available);
-}
-
 
 /*** EOF ***/

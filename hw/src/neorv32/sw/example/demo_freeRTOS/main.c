@@ -148,13 +148,13 @@ static void prvSetupHardware( void )
   // clear GPIO.out port
   neorv32_gpio_port_set(0);
 
-  // init UART at default baud rate, no parity bits, ho hw flow control
-  neorv32_uart0_setup(BAUD_RATE, PARITY_NONE, FLOW_CONTROL_NONE);
+  // setup UART at default baud rate, no interrupts (yet)
+  neorv32_uart0_setup(BAUD_RATE, 0);
 
   // check clock tick configuration
-  if (NEORV32_SYSINFO.CLK != (uint32_t)configCPU_CLOCK_HZ) {
+  if (NEORV32_SYSINFO->CLK != (uint32_t)configCPU_CLOCK_HZ) {
     neorv32_uart0_printf("Warning! Incorrect 'configCPU_CLOCK_HZ' configuration!\n"
-                         "Is %u Hz but should be %u Hz.\n\n", (uint32_t)configCPU_CLOCK_HZ, NEORV32_SYSINFO.CLK);
+                         "Is %u Hz but should be %u Hz.\n\n", (uint32_t)configCPU_CLOCK_HZ, NEORV32_SYSINFO->CLK);
   }
 
   // check available hardware ISA extensions and compare with compiler flags
@@ -260,8 +260,8 @@ void SystemIrqHandler( uint32_t mcause )
 #include <neorv32.h>
 int main() {
 
-  // init UART at default baud rate, no parity bits, ho hw flow control
-  neorv32_uart0_setup(BAUD_RATE, PARITY_NONE, FLOW_CONTROL_NONE);
+  // setup UART at default baud rate, no interrupts
+  neorv32_uart0_setup(BAUD_RATE, 0);
   neorv32_uart0_puts("ERROR! FreeRTOS has not been compiled. Use >>make USER_FLAGS+=-DRUN_FREERTOS_DEMO clean_all exe<< to compile it.\n");
   return 1;
 }

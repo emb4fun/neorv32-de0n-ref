@@ -61,6 +61,11 @@
   #define UART_BAUD 19200
 #endif
 
+/** Set to 1 to enable UART HW handshaking */
+#ifndef UART_HW_HANDSHAKE_EN
+  #define UART_HW_HANDSHAKE_EN 0
+#endif
+
 /* -------- Status LED -------- */
 
 /** Set to 0 to disable bootloader status LED (heart beat) at GPIO.gpio_o(STATUS_LED_PIN) */
@@ -166,6 +171,7 @@ enum SPI_FLASH_CMD_enum {
   SPI_FLASH_CMD_WRITE_DISABLE = 0x04, /**< Disallow write access */
   SPI_FLASH_CMD_READ_STATUS   = 0x05, /**< Get status register */
   SPI_FLASH_CMD_WRITE_ENABLE  = 0x06, /**< Allow write access */
+  SPI_FLASH_CMD_WAKE          = 0xAB, /**< Wake up from sleep mode */
   SPI_FLASH_CMD_SECTOR_ERASE  = 0xD8  /**< Erase complete sector */
 };
 
@@ -235,25 +241,26 @@ volatile uint32_t getting_exe;
 /**********************************************************************//**
  * Function prototypes
  **************************************************************************/
-void __attribute__((__interrupt__)) bootloader_trap_handler(void);
-void print_help(void);
-void start_app(int boot_xip);
-void get_exe(int src);
-void save_exe(void);
+void     __attribute__((__interrupt__)) bootloader_trap_handler(void);
+void     print_help(void);
+void     start_app(int boot_xip);
+void     get_exe(int src);
+void     save_exe(void);
 uint32_t get_exe_word(int src, uint32_t addr);
-void system_error(uint8_t err_code);
-void print_hex_word(uint32_t num);
+void     system_error(uint8_t err_code);
+void     print_hex_word(uint32_t num);
 
 // SPI flash driver functions
-int spi_flash_check(void);
+void    spi_flash_wakeup(void);
+int     spi_flash_check(void);
 uint8_t spi_flash_read_byte(uint32_t addr);
-void spi_flash_write_byte(uint32_t addr, uint8_t wdata);
-void spi_flash_write_word(uint32_t addr, uint32_t wdata);
-void spi_flash_erase_sector(uint32_t addr);
-void spi_flash_write_enable(void);
-void spi_flash_write_disable(void);
-uint32_t spi_flash_read_status(void);
-void spi_flash_write_addr(uint32_t addr);
+void    spi_flash_write_byte(uint32_t addr, uint8_t wdata);
+void    spi_flash_write_word(uint32_t addr, uint32_t wdata);
+void    spi_flash_erase_sector(uint32_t addr);
+void    spi_flash_write_enable(void);
+void    spi_flash_write_disable(void);
+uint8_t spi_flash_read_status(void);
+void    spi_flash_write_addr(uint32_t addr);
 
 
 /**********************************************************************//**
@@ -276,9 +283,9 @@ int main(void) {
   neorv32_cpu_csr_write(CSR_MTVEC, (uint32_t)(&bootloader_trap_handler));
 
 #if (SPI_EN != 0)
-  // setup SPI for 8-bit, clock-mode 0
+  // setup SPI for clock-mode 0
   if (neorv32_spi_available()) {
-    neorv32_spi_setup(SPI_FLASH_CLK_PRSC, 0, 0, 0, 0, 0);
+    neorv32_spi_setup(SPI_FLASH_CLK_PRSC, 0, 0, 0, 0);
   }
 #endif
 
@@ -299,16 +306,19 @@ int main(void) {
 #endif
 
 #if (UART_EN != 0)
-  // setup UART0 (primary UART, no parity bit, no hardware flow control)
-  neorv32_uart0_setup(UART_BAUD, PARITY_NONE, FLOW_CONTROL_NONE);
+  // setup UART0
+  neorv32_uart0_setup(UART_BAUD, 0);
+#if (UART_HW_HANDSHAKE_EN != 0)
+  neorv32_uart0_rtscts_enable();
+#endif
 #endif
 
   // Configure machine system timer interrupt
   if (neorv32_mtime_available()) {
-    NEORV32_MTIME.TIME_LO = 0;
-    NEORV32_MTIME.TIME_HI = 0;
-    NEORV32_MTIME.TIMECMP_LO = NEORV32_SYSINFO.CLK/4;
-    NEORV32_MTIME.TIMECMP_HI = 0;
+    NEORV32_MTIME->TIME_LO = 0;
+    NEORV32_MTIME->TIME_HI = 0;
+    NEORV32_MTIME->TIMECMP_LO = NEORV32_SYSINFO->CLK/4;
+    NEORV32_MTIME->TIMECMP_HI = 0;
     neorv32_cpu_csr_write(CSR_MIE, 1 << CSR_MIE_MTIE); // activate MTIME IRQ source
     neorv32_cpu_csr_set(CSR_MSTATUS, 1 << CSR_MSTATUS_MIE); // enable machine-mode interrupts
   }
@@ -321,22 +331,23 @@ int main(void) {
                      "BLDV: "__DATE__"\nHWV:  ");
   PRINT_XNUM(neorv32_cpu_csr_read(CSR_MIMPID));
   PRINT_TEXT("\nCID:  ");
-  PRINT_XNUM(NEORV32_SYSINFO.CUSTOM_ID);
+  PRINT_XNUM(NEORV32_SYSINFO->CUSTOM_ID);
   PRINT_TEXT("\nCLK:  ");
-  PRINT_XNUM(NEORV32_SYSINFO.CLK);
-  PRINT_TEXT("\nISA:  ");
+  PRINT_XNUM(NEORV32_SYSINFO->CLK);
+  PRINT_TEXT("\nMISA: ");
   PRINT_XNUM(neorv32_cpu_csr_read(CSR_MISA));
-  PRINT_TEXT(" + ");
+  PRINT_TEXT("\nXISA: ");
   PRINT_XNUM(neorv32_cpu_csr_read(CSR_MXISA));
   PRINT_TEXT("\nSOC:  ");
-  PRINT_XNUM(NEORV32_SYSINFO.SOC);
+  PRINT_XNUM(NEORV32_SYSINFO->SOC);
   PRINT_TEXT("\nIMEM: ");
-  PRINT_XNUM(NEORV32_SYSINFO.IMEM_SIZE); PRINT_TEXT(" bytes @");
-  PRINT_XNUM(NEORV32_SYSINFO.ISPACE_BASE);
+  PRINT_XNUM(NEORV32_SYSINFO->IMEM_SIZE); PRINT_TEXT(" bytes @");
+  PRINT_XNUM(NEORV32_SYSINFO->ISPACE_BASE);
   PRINT_TEXT("\nDMEM: ");
-  PRINT_XNUM(NEORV32_SYSINFO.DMEM_SIZE);
+  PRINT_XNUM(NEORV32_SYSINFO->DMEM_SIZE);
   PRINT_TEXT(" bytes @");
-  PRINT_XNUM(NEORV32_SYSINFO.DSPACE_BASE);
+  PRINT_XNUM(NEORV32_SYSINFO->DSPACE_BASE);
+  PRINT_TEXT("\n");
 
 
   // ------------------------------------------------
@@ -346,8 +357,8 @@ int main(void) {
 #if (AUTO_BOOT_TIMEOUT != 0)
   if (neorv32_mtime_available()) {
 
-    PRINT_TEXT("\n\nAutoboot in "xstr(AUTO_BOOT_TIMEOUT)"s. Press any key to abort.\n");
-    uint64_t timeout_time = neorv32_mtime_get_time() + (uint64_t)(AUTO_BOOT_TIMEOUT * NEORV32_SYSINFO.CLK);
+    PRINT_TEXT("\nAutoboot in "xstr(AUTO_BOOT_TIMEOUT)"s. Press any key to abort.\n");
+    uint64_t timeout_time = neorv32_mtime_get_time() + (uint64_t)(AUTO_BOOT_TIMEOUT * NEORV32_SYSINFO->CLK);
 
     while(1){
 
@@ -462,7 +473,7 @@ void start_app(int boot_xip) {
   // deactivate global IRQs
   neorv32_cpu_csr_clr(CSR_MSTATUS, 1 << CSR_MSTATUS_MIE);
 
-  register uint32_t app_base = NEORV32_SYSINFO.ISPACE_BASE; // default = start at beginning of IMEM
+  register uint32_t app_base = NEORV32_SYSINFO->ISPACE_BASE; // default = start at beginning of IMEM
 #if (XIP_EN != 0)
   if (boot_xip) {
     app_base = (uint32_t)(XIP_PAGE_BASE_ADDR + SPI_BOOT_BASE_ADDR); // start from XIP mapped address
@@ -502,7 +513,7 @@ void __attribute__((__interrupt__)) bootloader_trap_handler(void) {
 #endif
     // set time for next IRQ
     if (neorv32_mtime_available()) {
-      neorv32_mtime_set_timecmp(neorv32_mtime_get_time() + (NEORV32_SYSINFO.CLK/4));
+      neorv32_mtime_set_timecmp(neorv32_mtime_get_time() + (NEORV32_SYSINFO->CLK/4));
     }
   }
 
@@ -553,7 +564,7 @@ void get_exe(int src) {
     PRINT_TEXT(")...\n");
 
     // flash checks
-    if (((NEORV32_SYSINFO.SOC & (1<<SYSINFO_SOC_IO_SPI)) == 0) || // SPI module not implemented?
+    if (((NEORV32_SYSINFO->SOC & (1<<SYSINFO_SOC_IO_SPI)) == 0) || // SPI module not implemented?
        (spi_flash_check() != 0)) { // check if flash ready (or available at all)
       system_error(ERROR_FLASH);
     }
@@ -571,7 +582,7 @@ void get_exe(int src) {
   uint32_t check = get_exe_word(src, addr + EXE_OFFSET_CHECKSUM); // complement sum checksum
 
   // transfer program data
-  uint32_t *pnt = (uint32_t*)NEORV32_SYSINFO.ISPACE_BASE;
+  uint32_t *pnt = (uint32_t*)NEORV32_SYSINFO->ISPACE_BASE;
   uint32_t checksum = 0;
   uint32_t d = 0, i = 0;
   addr = addr + EXE_OFFSET_DATA;
@@ -641,7 +652,7 @@ void save_exe(void) {
 
   // store data from instruction memory and update checksum
   uint32_t checksum = 0;
-  uint32_t *pnt = (uint32_t*)NEORV32_SYSINFO.ISPACE_BASE;
+  uint32_t *pnt = (uint32_t*)NEORV32_SYSINFO->ISPACE_BASE;
   addr = addr + EXE_OFFSET_DATA;
   uint32_t i = 0;
   while (i < size) { // in chunks of 4 bytes
@@ -740,6 +751,18 @@ void print_hex_word(uint32_t num) {
 // -------------------------------------------------------------------------------------
 
 /**********************************************************************//**
+ * Wake up flash from deep sleep state
+ **************************************************************************/
+void spi_flash_wakeup(void) {
+
+#if (SPI_EN != 0)
+  neorv32_spi_cs_en(SPI_FLASH_CS);
+  neorv32_spi_trans(SPI_FLASH_CMD_WAKE);
+  neorv32_spi_cs_dis();
+#endif
+}
+
+/**********************************************************************//**
  * Check if SPI and flash are available/working by making sure the WEL
  * flag of the flash status register can be set and cleared again.
  *
@@ -748,6 +771,8 @@ void print_hex_word(uint32_t num) {
 int spi_flash_check(void) {
 
 #if (SPI_EN != 0)
+  // The flash may have been set to sleep prior to reaching this point. Make sure it's alive
+  spi_flash_wakeup();
 
   // set WEL
   spi_flash_write_enable();
@@ -780,7 +805,7 @@ uint8_t spi_flash_read_byte(uint32_t addr) {
 
   neorv32_spi_trans(SPI_FLASH_CMD_READ);
   spi_flash_write_addr(addr);
-  uint8_t rdata = (uint8_t)neorv32_spi_trans(0);
+  uint8_t rdata = neorv32_spi_trans(0);
 
   neorv32_spi_cs_dis();
 
@@ -901,13 +926,13 @@ void spi_flash_write_disable(void) {
  *
  * @return SPI flash status register (32-bit zero-extended).
  **************************************************************************/
-uint32_t spi_flash_read_status(void) {
+uint8_t spi_flash_read_status(void) {
 
 #if (SPI_EN != 0)
   neorv32_spi_cs_en(SPI_FLASH_CS);
 
   neorv32_spi_trans(SPI_FLASH_CMD_READ_STATUS);
-  uint32_t res = neorv32_spi_trans(0);
+  uint8_t res = neorv32_spi_trans(0);
 
   neorv32_spi_cs_dis();
 

@@ -3,9 +3,10 @@
  <Bookmarks/>
  <Breakpoints groups="Breakpoints" active_group="Breakpoints"/>
  <ExecutionProfileWindow/>
- <FrameBufferWindow>
-  <FrameBufferWindow bufferHeight="-1" addressSpace="" addressText="" bufferWidth="-1"/>
- </FrameBufferWindow>
+ <FrameBuffer>
+  <FrameBufferWindow width="1012598480" keepAspectRatio="0" zoomToFitWindow="0" addressSpace="" format="0" height="532" autoEvaluate="0" scaleFactor="1" refreshPeriod="0" name="coremark_TCM Release" addressText="" accessByDisplayWidth="0"/>
+  <FrameBufferWindow width="1012598480" keepAspectRatio="0" zoomToFitWindow="0" addressSpace="" format="0" height="532" autoEvaluate="0" scaleFactor="1" refreshPeriod="0" name="coremark_SDRAM Release" addressText="" accessByDisplayWidth="0"/>
+ </FrameBuffer>
  <Memory1>
   <MemoryWindow addressSpace="" dataSize="1" autoEvaluate="0" viewMode="0" viewType="4" addressOrder="0" columnsText="" refreshPeriod="0" name="coremark_TCM Release" sizeText="" addressText=""/>
   <MemoryWindow addressSpace="" dataSize="1" autoEvaluate="0" viewMode="0" viewType="4" addressOrder="0" columnsText="" refreshPeriod="0" name="coremark_TCM Debug" sizeText="" addressText=""/>
@@ -29,6 +30,8 @@
  <Project>
   <ProjectSessionItem path="coremark"/>
   <ProjectSessionItem path="coremark;coremark"/>
+  <ProjectSessionItem path="coremark;coremark;Source Files"/>
+  <ProjectSessionItem path="coremark;coremark;Source Files;coremark"/>
  </Project>
  <Register1>
   <RegisterWindow visibleNodes="ABI, RV32I/pc;ABI, RV32I/ra;ABI, RV32I/sp;ABI, RV32I/gp;ABI, RV32I/tp;ABI, RV32I/a0;ABI, RV32I/a1;ABI, RV32I/a2;ABI, RV32I/a3;ABI, RV32I/a4;ABI, RV32I/a5;ABI, RV32I/a6;ABI, RV32I/a7;ABI, RV32I/t0;ABI, RV32I/t1;ABI, RV32I/t2;ABI, RV32I/t3;ABI, RV32I/t4;ABI, RV32I/t5;ABI, RV32I/t6;ABI, RV32I/s0;ABI, RV32I/s1;ABI, RV32I/s2;ABI, RV32I/s3;ABI, RV32I/s4;ABI, RV32I/s5;ABI, RV32I/s6;ABI, RV32I/s7;ABI, RV32I/s8;ABI, RV32I/s9;ABI, RV32I/s10;ABI, RV32I/s11;CPU, RV32I/pc;CPU, RV32I/x1;CPU, RV32I/x2;CPU, RV32I/x3;CPU, RV32I/x4;CPU, RV32I/x5;CPU, RV32I/x6;CPU, RV32I/x7;CPU, RV32I/x8;CPU, RV32I/x9;CPU, RV32I/x10;CPU, RV32I/x11;CPU, RV32I/x12;CPU, RV32I/x13;CPU, RV32I/x14;CPU, RV32I/x15;CPU, RV32I/x16;CPU, RV32I/x17;CPU, RV32I/x18;CPU, RV32I/x19;CPU, RV32I/x20;CPU, RV32I/x21;CPU, RV32I/x22;CPU, RV32I/x23;CPU, RV32I/x24;CPU, RV32I/x25;CPU, RV32I/x26;CPU, RV32I/x27;CPU, RV32I/x28;CPU, RV32I/x29;CPU, RV32I/x30;CPU, RV32I/x31" binaryNodes="" asciiNodes="" openNodes="CPU, RV32I" name="coremark_TCM Release" decimalNodes="" octalNodes="" unsignedNodes=""/>

@@ -46,7 +46,8 @@ entity neorv32_top_avalonmm is
   generic (
     -- General --
     CLOCK_FREQUENCY              : natural;           -- clock frequency of clk_i in Hz
-    HW_THREAD_ID                 : natural := 0;      -- hardware thread id (32-bit)
+    HART_ID                      : std_ulogic_vector(31 downto 0) := x"00000000"; -- hardware thread ID
+    VENDOR_ID                    : std_ulogic_vector(31 downto 0) := x"00000000"; -- vendor's JEDEC ID
     CUSTOM_ID                    : std_ulogic_vector(31 downto 0) := x"00000000"; -- custom user-defined ID
     INT_BOOTLOADER_EN            : boolean := false;  -- boot configuration: true = boot explicit bootloader; false = boot from int/ext (I)MEM
 
@@ -60,7 +61,6 @@ entity neorv32_top_avalonmm is
     CPU_EXTENSION_RISCV_M        : boolean := false;  -- implement mul/div extension?
     CPU_EXTENSION_RISCV_U        : boolean := false;  -- implement user mode extension?
     CPU_EXTENSION_RISCV_Zfinx    : boolean := false;  -- implement 32-bit floating-point extension (using INT regs!)
-    CPU_EXTENSION_RISCV_Zicsr    : boolean := true;   -- implement CSR system?
     CPU_EXTENSION_RISCV_Zicntr   : boolean := true;   -- implement base counters?
     CPU_EXTENSION_RISCV_Zihpm    : boolean := false;  -- implement hardware performance monitors?
     CPU_EXTENSION_RISCV_Zifencei : boolean := false;  -- implement instruction stream sync.?
@@ -94,6 +94,11 @@ entity neorv32_top_avalonmm is
     ICACHE_BLOCK_SIZE            : natural := 64;     -- i-cache: block size in bytes (min 4), has to be a power of 2
     ICACHE_ASSOCIATIVITY         : natural := 1;      -- i-cache: associativity / number of sets (1=direct_mapped), has to be a power of 2
 
+    -- Internal Data Cache (dCACHE) --
+    DCACHE_EN                    : boolean := false;  -- implement data cache
+    DCACHE_NUM_BLOCKS            : natural := 4;      -- d-cache: number of blocks (min 1), has to be a power of 2
+    DCACHE_BLOCK_SIZE            : natural := 64;     -- d-cache: block size in bytes (min 4), has to be a power of 2
+
     -- External Interrupts Controller (XIRQ) --
     XIRQ_NUM_CH                  : natural := 0;      -- number of external IRQ channels (0..32)
     XIRQ_TRIGGER_TYPE            : std_ulogic_vector(31 downto 0) := x"ffffffff"; -- trigger type: 0=level, 1=edge
@@ -109,7 +114,7 @@ entity neorv32_top_avalonmm is
     IO_UART1_RX_FIFO             : natural := 1;      -- RX fifo depth, has to be a power of two, min 1
     IO_UART1_TX_FIFO             : natural := 1;      -- TX fifo depth, has to be a power of two, min 1
     IO_SPI_EN                    : boolean := false;  -- implement serial peripheral interface (SPI)?
-    IO_SPI_FIFO                  : natural := 0;      -- SPI RTX fifo depth, has to be zero or a power of two
+    IO_SPI_FIFO                  : natural := 1;      -- SPI RTX fifo depth, has to be a power of two, min 1
     IO_TWI_EN                    : boolean := false;  -- implement two-wire interface (TWI)?
     IO_PWM_NUM_CH                : natural := 0;      -- number of PWM channels to implement (0..12); 0 = disabled
     IO_WDT_EN                    : boolean := false;  -- implement watch dog timer (WDT)?
@@ -153,8 +158,8 @@ entity neorv32_top_avalonmm is
     -- XIP (execute in place via SPI) signals (available if IO_XIP_EN = true) --
     xip_csn_o      : out std_ulogic; -- chip-select, low-active
     xip_clk_o      : out std_ulogic; -- serial clock
-    xip_sdi_i      : in  std_ulogic := 'L'; -- device data input
-    xip_sdo_o      : out std_ulogic; -- controller data output
+    xip_dat_i      : in  std_ulogic := 'L'; -- device data input
+    xip_dat_o      : out std_ulogic; -- controller data output
 
     -- GPIO (available if IO_GPIO_EN = true) --
     gpio_o         : out std_ulogic_vector(63 downto 0); -- parallel output
@@ -163,27 +168,30 @@ entity neorv32_top_avalonmm is
     -- primary UART0 (available if IO_UART0_EN = true) --
     uart0_txd_o    : out std_ulogic; -- UART0 send data
     uart0_rxd_i    : in  std_ulogic := 'U'; -- UART0 receive data
-    uart0_rts_o    : out std_ulogic; -- hw flow control: UART0.RX ready to receive ("RTR"), low-active, optional
-    uart0_cts_i    : in  std_ulogic := 'L'; -- hw flow control: UART0.TX allowed to transmit, low-active, optional
+    uart0_rts_o    : out std_ulogic; -- HW flow control: UART0.RX ready to receive ("RTR"), low-active, optional
+    uart0_cts_i    : in  std_ulogic := 'L'; -- HW flow control: UART0.TX allowed to transmit, low-active, optional
 
     -- secondary UART1 (available if IO_UART1_EN = true) --
     uart1_txd_o    : out std_ulogic; -- UART1 send data
     uart1_rxd_i    : in  std_ulogic := 'U'; -- UART1 receive data
-    uart1_rts_o    : out std_ulogic; -- hw flow control: UART1.RX ready to receive ("RTR"), low-active, optional
-    uart1_cts_i    : in  std_ulogic := 'L'; -- hw flow control: UART1.TX allowed to transmit, low-active, optional
+    uart1_rts_o    : out std_ulogic; -- HW flow control: UART1.RX ready to receive ("RTR"), low-active, optional
+    uart1_cts_i    : in  std_ulogic := 'L'; -- HW flow control: UART1.TX allowed to transmit, low-active, optional
 
     -- SPI (available if IO_SPI_EN = true) --
-    spi_sck_o      : out std_ulogic; -- SPI serial clock
-    spi_sdo_o      : out std_ulogic; -- controller data out, peripheral data in
-    spi_sdi_i      : in  std_ulogic := 'U'; -- controller data in, peripheral data out
+    spi_clk_o      : out std_ulogic; -- SPI serial clock
+    spi_dat_o      : out std_ulogic; -- controller data out, peripheral data in
+    spi_dat_i      : in  std_ulogic := 'U'; -- controller data in, peripheral data out
     spi_csn_o      : out std_ulogic_vector(07 downto 0); -- chip-select
 
     -- TWI (available if IO_TWI_EN = true) --
-    twi_sda_io     : inout std_logic := 'U'; -- twi serial data line
-    twi_scl_io     : inout std_logic := 'U'; -- twi serial clock line
+    twi_sda_i      : in  std_ulogic := 'H'; -- serial data line sense input
+    twi_sda_o      : out std_ulogic; -- serial data line output (pull low only)
+    twi_scl_i      : in  std_ulogic := 'H'; -- serial clock line sense input
+    twi_scl_o      : out std_ulogic; -- serial clock line output (pull low only)
 
     -- 1-Wire Interface (available if IO_ONEWIRE_EN = true) --
-    onewire_io     : inout std_logic; -- 1-wire bus
+    onewire_i      : in  std_ulogic := 'H'; -- 1-wire bus sense input
+    onewire_o      : out std_ulogic; -- 1-wire bus output (pull low only)
 
     -- PWM (available if IO_PWM_NUM_CH > 0) --
     pwm_o          : out std_ulogic_vector(11 downto 0); -- pwm channels
@@ -225,9 +233,9 @@ begin
   generic map (
     -- General --
     CLOCK_FREQUENCY => CLOCK_FREQUENCY,
-    HW_THREAD_ID => HW_THREAD_ID,
+    HART_ID => HART_ID,
+    VENDOR_ID => VENDOR_ID,
     CUSTOM_ID => CUSTOM_ID,
-    INT_BOOTLOADER_EN => INT_BOOTLOADER_EN,
 
     -- On-Chip Debugger (OCD) --
     ON_CHIP_DEBUGGER_EN => ON_CHIP_DEBUGGER_EN,
@@ -239,7 +247,6 @@ begin
     CPU_EXTENSION_RISCV_M => CPU_EXTENSION_RISCV_M,
     CPU_EXTENSION_RISCV_U => CPU_EXTENSION_RISCV_U,
     CPU_EXTENSION_RISCV_Zfinx => CPU_EXTENSION_RISCV_Zfinx,
-    CPU_EXTENSION_RISCV_Zicsr => CPU_EXTENSION_RISCV_Zicsr,
     CPU_EXTENSION_RISCV_Zicntr => CPU_EXTENSION_RISCV_Zicntr,
     CPU_EXTENSION_RISCV_Zihpm => CPU_EXTENSION_RISCV_Zihpm,
     CPU_EXTENSION_RISCV_Zifencei => CPU_EXTENSION_RISCV_Zifencei,
@@ -272,6 +279,11 @@ begin
     ICACHE_NUM_BLOCKS => ICACHE_NUM_BLOCKS,
     ICACHE_BLOCK_SIZE => ICACHE_BLOCK_SIZE,
     ICACHE_ASSOCIATIVITY => ICACHE_ASSOCIATIVITY,
+
+    -- Internal Data Cache (dCACHE) --
+    DCACHE_EN => DCACHE_EN,
+    DCACHE_NUM_BLOCKS => DCACHE_NUM_BLOCKS,
+    DCACHE_BLOCK_SIZE => DCACHE_BLOCK_SIZE,
 
     -- External memory interface (WISHBONE) --
     MEM_EXT_EN => true,
@@ -343,8 +355,8 @@ begin
     -- XIP (execute in place via SPI) signals (available if IO_XIP_EN = true) --
     xip_csn_o => xip_csn_o,
     xip_clk_o => xip_clk_o,
-    xip_sdi_i => xip_sdi_i,
-    xip_sdo_o => xip_sdo_o,
+    xip_dat_i => xip_dat_i,
+    xip_dat_o => xip_dat_o,
 
     -- GPIO (available if IO_GPIO_EN = true) --
     gpio_o => gpio_o,
@@ -363,17 +375,20 @@ begin
     uart1_cts_i => uart1_cts_i,
 
     -- SPI (available if IO_SPI_EN = true) --
-    spi_sck_o => spi_sck_o,
-    spi_sdo_o => spi_sdo_o,
-    spi_sdi_i => spi_sdi_i,
+    spi_clk_o => spi_clk_o,
+    spi_dat_o => spi_dat_o,
+    spi_dat_i => spi_dat_i,
     spi_csn_o => spi_csn_o,
 
     -- TWI (available if IO_TWI_EN = true) --
-    twi_sda_io => twi_sda_io,
-    twi_scl_io => twi_scl_io,
+    twi_sda_i => twi_sda_i,
+    twi_sda_o => twi_sda_o,
+    twi_scl_i => twi_scl_i,
+    twi_scl_o => twi_scl_o,
 
     -- 1-Wire Interface (available if IO_ONEWIRE_EN = true) --
-    onewire_io => onewire_io,
+    onewire_i => onewire_i,
+    onewire_o => onewire_o,
 
     -- PWM (available if IO_PWM_NUM_CH > 0) --
     pwm_o => pwm_o,

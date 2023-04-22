@@ -41,12 +41,6 @@
 #include <stdint.h>
 #include "tcts.h"
 
-#if defined(RTOS_TCTS)
-#include "tcts.h"
-#else
-#include "osal.h"
-#endif
-
 /**************************************************************************
 *  Global Definitions
 **************************************************************************/

@@ -37,7 +37,7 @@
 -- # ********************************************************************************************* #
 -- # BSD 3-Clause License                                                                          #
 -- #                                                                                               #
--- # Copyright (c) 2022, Stephan Nolting. All rights reserved.                                     #
+-- # Copyright (c) 2023, Stephan Nolting. All rights reserved.                                     #
 -- #                                                                                               #
 -- # Redistribution and use in source and binary forms, with or without modification, are          #
 -- # permitted provided that the following conditions are met:                                     #
@@ -108,7 +108,12 @@ end neorv32_litex_core_complex;
 
 architecture neorv32_litex_core_complex_rtl of neorv32_litex_core_complex is
 
-  -- advance configuration --
+  -- identifiers --
+  constant hart_id_c  : std_ulogic_vector(31 downto 0) := x"00000000"; -- hardware thread ID ("core ID")
+  constant jedec_id_c : std_ulogic_vector(31 downto 0) := x"00000000"; -- vendor's JEDEC manufacturer ID
+  constant user_id_c  : std_ulogic_vector(31 downto 0) := x"00000000"; -- custom user ID
+
+  -- advanced configuration --
   constant num_configs_c : natural := 4;     -- number of pre-defined configurations
   constant wb_timeout_c  : natural := 4096;  -- external bus interface timeout cycles
   constant big_endian_c  : boolean := false; -- external bus interface endianness; default is little-endian
@@ -130,6 +135,9 @@ architecture neorv32_litex_core_complex_rtl of neorv32_litex_core_complex is
     icache_nb    : natural_t;
     icache_bs    : natural_t;
     icache_as    : natural_t;
+    dcache_en    : bool_t;
+    dcache_nb    : natural_t;
+    dcache_bs    : natural_t;
     mtime        : bool_t;
   end record;
 
@@ -149,6 +157,9 @@ architecture neorv32_litex_core_complex_rtl of neorv32_litex_core_complex is
     icache_nb    => ( 0,       0,       8,       8     ), -- number of cache blocks (lines), power of two
     icache_bs    => ( 0,       0,       64,      256   ), -- size of cache clock (lines) in bytes, power of two
     icache_as    => ( 1,       1,       1,       2     ), -- associativity (1 or 2)
+    dcache_en    => ( false,   false,   true,    true  ), -- instruction data enabled
+    dcache_nb    => ( 0,       0,       8,       8     ), -- number of cache blocks (lines), power of two
+    dcache_bs    => ( 0,       0,       64,      256   ), -- size of cache clock (lines) in bytes, power of two
     mtime        => ( false,   true,    true,    true  )  -- RISC-V machine system timers
   );
 
@@ -160,13 +171,15 @@ begin
   generic map (
     -- General --
     CLOCK_FREQUENCY              => 0,                              -- clock frequency of clk_i in Hz [not required by the core complex]
+    HART_ID                      => hart_id_c,                      -- hardware thread ID
+    VENDOR_ID                    => jedec_id_c,                     -- vendor's JEDEC ID
+    CUSTOM_ID                    => user_id_c,                      -- custom user-defined ID
     -- On-Chip Debugger (OCD) --
     ON_CHIP_DEBUGGER_EN          => DEBUG,                          -- implement on-chip debugger
     -- RISC-V CPU Extensions --
     CPU_EXTENSION_RISCV_C        => configs_c.riscv_c(CONFIG),      -- implement compressed extension?
     CPU_EXTENSION_RISCV_M        => configs_c.riscv_m(CONFIG),      -- implement mul/div extension?
     CPU_EXTENSION_RISCV_U        => configs_c.riscv_u(CONFIG),      -- implement user mode extension?
-    CPU_EXTENSION_RISCV_Zicsr    => true,                           -- implement CSR system?
     CPU_EXTENSION_RISCV_Zicntr   => configs_c.riscv_zicntr(CONFIG), -- implement base counters?
     CPU_EXTENSION_RISCV_Zihpm    => configs_c.riscv_zihpm(CONFIG),  -- implement hardware performance monitors?
     CPU_EXTENSION_RISCV_Zifencei => true,                           -- implement instruction stream sync.?
@@ -185,6 +198,10 @@ begin
     ICACHE_NUM_BLOCKS            => configs_c.icache_nb(CONFIG),    -- i-cache: number of blocks (min 1), has to be a power of 2
     ICACHE_BLOCK_SIZE            => configs_c.icache_bs(CONFIG),    -- i-cache: block size in bytes (min 4), has to be a power of 2
     ICACHE_ASSOCIATIVITY         => configs_c.icache_as(CONFIG),    -- i-cache: associativity / number of sets (1=direct_mapped), has to be a power of 2
+    -- Internal Data Cache (dCACHE) --
+    DCACHE_EN                    => configs_c.dcache_en(CONFIG),    -- implement data cache
+    DCACHE_NUM_BLOCKS            => configs_c.dcache_nb(CONFIG),    -- d-cache: number of blocks (min 1), has to be a power of 2
+    DCACHE_BLOCK_SIZE            => configs_c.dcache_bs(CONFIG),    -- d-cache: block size in bytes (min 4), has to be a power of 2
     -- External memory interface (WISHBONE) --
     MEM_EXT_EN                   => true,                           -- implement external memory bus interface?
     MEM_EXT_TIMEOUT              => wb_timeout_c,                   -- cycles after a pending bus access auto-terminates (0 = disabled)

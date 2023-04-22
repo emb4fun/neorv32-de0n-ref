@@ -1,7 +1,7 @@
 /**************************************************************************
 *  This file is part of the TAL project (Tiny Abstraction Layer)
 *
-*  Copyright (c) 2020-2022 by Michael Fischer (www.emb4fun.de).
+*  Copyright (c) 2023 by Michael Fischer (www.emb4fun.de).
 *  All rights reserved.
 *
 *  Redistribution and use in source and binary forms, with or without 
@@ -83,13 +83,28 @@ typedef enum _tal_led_channel_
 /*
  * Configure external memory for the HEAP
  */
-#if defined(__SDRAM__)
+#if defined(__TCM__)
+#define TAL_HEAP_MEM1_START   __SDRAM_segment_start__
+#define TAL_HEAP_MEM1_END     __SDRAM_segment_end__
+#endif
+
+#if defined(__XIP__)
 #define TAL_HEAP_MEM1_START   __SDRAM_segment_used_end__
 #define TAL_HEAP_MEM1_END     __SDRAM_segment_end__
 #endif
 
-#if defined(__TCM__)
+#if defined(__XIP_TO_TCM__)
 #define TAL_HEAP_MEM1_START   __SDRAM_segment_start__
+#define TAL_HEAP_MEM1_END     __SDRAM_segment_end__
+#endif
+
+#if defined(__XIP_TO_SDRAM__)
+#define TAL_HEAP_MEM1_START   __SDRAM_segment_used_end__
+#define TAL_HEAP_MEM1_END     __SDRAM_segment_end__
+#endif
+
+#if defined(__SDRAM__)
+#define TAL_HEAP_MEM1_START   __SDRAM_segment_used_end__
 #define TAL_HEAP_MEM1_END     __SDRAM_segment_end__
 #endif
 

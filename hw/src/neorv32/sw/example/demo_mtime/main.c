@@ -67,8 +67,8 @@ int main() {
   // capture all exceptions and give debug info via UART
   neorv32_rte_setup();
 
-  // init UART at default baud rate, no parity bits, no hw flow control
-  neorv32_uart0_setup(BAUD_RATE, PARITY_NONE, FLOW_CONTROL_NONE);
+  // setup UART at default baud rate, no interrupts
+  neorv32_uart0_setup(BAUD_RATE, 0);
 
 
   // check if MTIME unit is implemented at all
@@ -91,7 +91,7 @@ int main() {
 
   // configure MTIME timer's first interrupt to appear after SYSTEM_CLOCK / 2 cycles (toggle at 2Hz)
   // starting from _now_
-  neorv32_mtime_set_timecmp(neorv32_mtime_get_time() + (NEORV32_SYSINFO.CLK / 2));
+  neorv32_mtime_set_timecmp(neorv32_mtime_get_time() + (NEORV32_SYSINFO->CLK / 2));
 
   // enable interrupt
   neorv32_cpu_csr_set(CSR_MIE, 1 << CSR_MIE_MTIE); // enable MTIME interrupt
@@ -116,7 +116,7 @@ void mtime_irq_handler(void) {
 
   // update MTIMECMP value for next IRQ (in SYSTEM_CLOCK / 2 cycles)
   // this will also ack/clear the current MTIME interrupt request
-  neorv32_mtime_set_timecmp(neorv32_mtime_get_timecmp() + (NEORV32_SYSINFO.CLK / 2));
+  neorv32_mtime_set_timecmp(neorv32_mtime_get_timecmp() + (NEORV32_SYSINFO->CLK / 2));
 
 
   neorv32_uart0_putc('.'); // send tick symbol via UART

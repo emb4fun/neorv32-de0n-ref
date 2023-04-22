@@ -33,7 +33,6 @@ set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "./neorv32
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "./neorv32/rtl/core/neorv32_neoled.vhd"] -library neorv32
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "./neorv32/rtl/core/neorv32_onewire.vhd"] -library neorv32
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "./neorv32/rtl/core/neorv32_pwm.vhd"] -library neorv32
-set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "./neorv32/rtl/core/neorv32_slink.vhd"] -library neorv32
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "./neorv32/rtl/core/neorv32_spi.vhd"] -library neorv32
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "./neorv32/rtl/core/neorv32_sysinfo.vhd"] -library neorv32
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) "./neorv32/rtl/core/neorv32_trng.vhd"] -library neorv32

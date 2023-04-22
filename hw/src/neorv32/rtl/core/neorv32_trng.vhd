@@ -3,7 +3,7 @@
 -- # ********************************************************************************************* #
 -- # This processor module instantiates the "neoTRNG" true random number generator. An optional    #
 -- # "random pool" FIFO can be configured using the TRNG_FIFO generic.                             #
--- # See the neoTRNG's documentation for more information: https://github.com/stnolting/neoTRNG    #
+-- # See the neoTRNG documentation for more information: https://github.com/stnolting/neoTRNG      #
 -- # ********************************************************************************************* #
 -- # BSD 3-Clause License                                                                          #
 -- #                                                                                               #
@@ -133,15 +133,15 @@ begin
   assert not (sim_mode_c = true) report "NEORV32 PROCESSOR CONFIG WARNING: TRNG uses SIMULATION mode!" severity warning;
 
 
-  -- Access Control -------------------------------------------------------------------------
+  -- Write Access ---------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
+
+  -- access control --
   acc_en <= '1' when (addr_i(hi_abb_c downto lo_abb_c) = trng_base_c(hi_abb_c downto lo_abb_c)) else '0';
   wren   <= acc_en and wren_i;
   rden   <= acc_en and rden_i;
 
-
-  -- Write Access ---------------------------------------------------------------------------
-  -- -------------------------------------------------------------------------------------------
+  -- write access --
   write_access: process(rstn_i, clk_i)
   begin
     if (rstn_i = '0') then
@@ -156,17 +156,16 @@ begin
     end if;
   end process write_access;
 
-
-  -- Read Access ----------------------------------------------------------------------------
-  -- -------------------------------------------------------------------------------------------
+  -- read access --
   read_access: process(clk_i)
   begin
     if rising_edge(clk_i) then
       ack_o  <= wren or rden; -- host bus acknowledge
       data_o <= (others => '0');
       if (rden = '1') then
-        data_o(ctrl_data_msb_c downto ctrl_data_lsb_c) <= fifo.rdata;
-        --
+        if (fifo.avail = '1') then -- make sure data byte is zero if no valid data available to prevent it is read twice
+          data_o(ctrl_data_msb_c downto ctrl_data_lsb_c) <= fifo.rdata;
+        end if;
         data_o(ctrl_sim_mode_c) <= bool_to_ulogic_f(sim_mode_c);
         data_o(ctrl_en_c)       <= enable;
         data_o(ctrl_valid_c)    <= fifo.avail;
@@ -201,9 +200,8 @@ begin
   generic map (
     FIFO_DEPTH => IO_TRNG_FIFO, -- number of fifo entries; has to be a power of two; min 1
     FIFO_WIDTH => 8,            -- size of data elements in fifo
-    FIFO_RSYNC => false,        -- async read
-    FIFO_SAFE  => true,         -- safe access
-    FIFO_GATE  => true          -- make sure the same RND data byte cannot be read twice
+    FIFO_RSYNC => true,         -- sync read
+    FIFO_SAFE  => true          -- safe access
   )
   port map (
     -- control --
@@ -221,11 +219,8 @@ begin
     avail_o => fifo.avail  -- data available when set
   );
 
-  -- fifo reset --
   fifo.clear <= '1' when (enable = '0') or (fifo_clr = '1') else '0';
-
-  -- read access --
-  fifo.re <= '1' when (rden = '1') else '0';
+  fifo.re    <= '1' when (rden = '1') else '0';
 
 
 end neorv32_trng_rtl;
@@ -642,7 +637,8 @@ architecture neoTRNG_cell_rtl of neoTRNG_cell is
   signal feedback      : std_ulogic; -- cell feedback/output
   signal enable_sreg_s : std_ulogic_vector(NUM_INV_S-1 downto 0); -- enable shift register for short chain
   signal enable_sreg_l : std_ulogic_vector(NUM_INV_L-1 downto 0); -- enable shift register for long chain
-  signal lfsr          : std_ulogic_vector(15 downto 0); -- LFSR - for simulation only!!!
+  signal lfsr          : std_ulogic_vector(9 downto 0); -- LFSR - for simulation only!!!
+  signal lfsr_bit      : std_ulogic;
 
 begin
 
@@ -706,13 +702,14 @@ begin
         lfsr <= (others => '0');
       elsif rising_edge(clk_i) then
         if (enable_sreg_l(enable_sreg_l'left) = '0') then
-          lfsr <= std_ulogic_vector(to_unsigned(NUM_INV_S, 16));
+          lfsr <= std_ulogic_vector(to_unsigned(NUM_INV_S, lfsr'length));
         else
-          lfsr <= lfsr(lfsr'left-1 downto 0) & (lfsr(15) xnor lfsr(14) xnor lfsr(13) xnor lfsr(2));
+          lfsr <= lfsr(lfsr'left-1 downto 0) & lfsr_bit;
         end if;
       end if;
     end process sim_lfsr;
 
+    lfsr_bit <= not (lfsr(9) xor lfsr(6));
     feedback <= lfsr(lfsr'left);
     data_o   <= feedback;
   end generate;

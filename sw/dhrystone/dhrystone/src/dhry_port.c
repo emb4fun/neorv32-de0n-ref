@@ -92,7 +92,7 @@ float dhry_GetCPUFreqMHz (void)
 {
    float Frequency;
    
-   Frequency = (float)NEORV32_SYSINFO.CLK / 1000000.0;   
+   Frequency = (float)NEORV32_SYSINFO->CLK / 1000000.0;   
    
    return(Frequency);
 } /* dhry_GetCPUFreqMHz */
@@ -112,7 +112,7 @@ float dhry_ftime (void)
    float    Time;
    
    Ticks = neorv32_mtime_get_time();;
-   Time  = (float)Ticks / NEORV32_SYSINFO.CLK;
+   Time  = (float)Ticks / NEORV32_SYSINFO->CLK;
    
    return(Time);   
 } /* dhry_ftime */

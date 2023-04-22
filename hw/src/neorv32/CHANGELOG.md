@@ -1,21 +1,23 @@
 ## Project Change Log
 
 The most recent version of the **NEORV32** project can be found at the top of this list.
-"Stable releases" are linked and highlighted :rocket:.
-The latest release is [![release](https://img.shields.io/github/v/release/stnolting/neorv32)](https://github.com/stnolting/neorv32/releases).
+"Stable releases" are linked and highlighted :rocket:. The latest release is
+[![release](https://img.shields.io/github/v/release/stnolting/neorv32)](https://github.com/stnolting/neorv32/releases).
 A list of all releases can be found [here](https://github.com/stnolting/neorv32/releases).
 
 Starting with version `1.5.7` this project uses [semantic versioning](https://semver.org).
-The _hardware version identifier_ uses an additional custom element (`MAJOR.MINOR.PATCH.custom`) to track _individual_ changes.
-The identifier number is incremented with every core RTL modification and also by major framework modifications.
+The _version identifier_ uses an additional **custom** element (`MAJOR.MINOR.PATCH.custom`)
+to track _individual_ changes. The identifier number is incremented with every core RTL
+modification and also by major framework modifications.
 
 The version number is globally defined by the `hw_version_c` constant in the main VHDL
 [package file](https://github.com/stnolting/neorv32/blob/main/rtl/core/neorv32_package.vhd).
-The processor can determine its version by reading the `mimpid` CSR (at CSR address 0xf13).
-A 8x4-bit BCD representation is used. Leading zeros are optional. Example:
+The processor can determine this version by reading the RISC-V-compatible `mimpid` CSR.
+A 8x4-bit BCD representation is used. Examples:
 
 ```
 mimpid = 0x01040312 => Version 01.04.03.12 => v1.4.3.12
+mimpid = 0x01080200 => Version 01.08.02.00 => v1.8.2
 ```
 
 
@@ -24,13 +26,43 @@ mimpid = 0x01040312 => Version 01.04.03.12 => v1.4.3.12
 * :bug: bug-fix
 * :sparkles: new feature
 * :test_tube: new (experimental) feature
-* :warning: (major) change that might impact compatibility with previous versions
+* :warning: change(s) that might impact compatibility with previous versions
 * :lock: security-related
 * :rocket: release
 
 
 | Date (*dd.mm.yyyy*) | Version | Comment |
 |:-------------------:|:-------:|:--------|
+| 21.04.2023 | [**:rocket:1.8.4**](https://github.com/stnolting/neorv32/releases/tag/v1.8.4) | **New release** |
+| 21.04.2023 | 1.8.3.9 | :bug: fix timeout bug in **FPU** normalizer; [#592](https://github.com/stnolting/neorv32/pull/592) |
+| 19.04.2023 | 1.8.3.8 | minor processor bus system optimizations and clean-ups; [#591](https://github.com/stnolting/neorv32/pull/591) |
+| 15.04.2023 | 1.8.3.7 | :bug: :warning: `wfi` and XIRQ bug fixes; massive RTL code cleanup and optimization of CPU control; [#586](https://github.com/stnolting/neorv32/pull/586) |
+| 14.04.2023 | 1.8.3.6 | [UARTs] software can now retrieve the configured RX/TX FIFO sizes from the `DATA` register; [#581](https://github.com/stnolting/neorv32/pull/581) |
+| 13.04.2023 | 1.8.3.5 | :bug: fixed bug in FPU control logic (introduced in some earlier clean-up commit); minor code edits and optimizations; [#578](https://github.com/stnolting/neorv32/pull/578) |
+| 07.04.2023 | 1.8.3.4 | rtl edits and cleanups; [#571](https://github.com/stnolting/neorv32/pull/571) |
+| 05.04.2023 | 1.8.3.3 | update **external interrupt controller (XIRQ)**; [#570](https://github.com/stnolting/neorv32/pull/570) |
+| 05.04.2023 | 1.8.3.2 | `time` CSR struggles (again) and logic optimization; [#569](https://github.com/stnolting/neorv32/pull/569) |
+| 01.04.2023 | 1.8.3.1 | :sparkles: add full `NA4` and `NAPOT` support to the (now) RISC-V-compatible **physical memory protection (PMP)**; [#566](https://github.com/stnolting/neorv32/pull/566) |
+| 31.03.2023 | [**:rocket:1.8.3**](https://github.com/stnolting/neorv32/releases/tag/v1.8.3) | **New release** |
+| 29.03.2023 | 1.8.2.9 | :warning: remove `CPU_EXTENSION_RISCV_Zicsr` generic - `Zicsr` ISA extension is always enabled; optimize bus switch; VHDL code cleanups; [#562](https://github.com/stnolting/neorv32/pull/562) |
+| 25.03.2023 | 1.8.2.8 | :test_tube: add configurable data cache (**dCACHE**); [#560](https://github.com/stnolting/neorv32/pull/560) |
+| 24.03.2023 | 1.8.2.7 | :sparkles: add full support of `mcounteren` CSR; cleanup counter and PMP CSRs; i-cache optimization; [#559](https://github.com/stnolting/neorv32/pull/559) |
+| 18.03.2023 | 1.8.2.6 | add new generic `JEDEC_ID` (official JEDEC identifier; used for `mvendorid` CSR); further generics cleanups; [#557](https://github.com/stnolting/neorv32/pull/557)
+| 17.03.2023 | 1.8.2.5 | add RISC-V `time[h]` CSRs (part of the `Zicntr` ISA extension); [#556](https://github.com/stnolting/neorv32/pull/556) |
+| 17.03.2023 | 1.8.2.4 | re-add VHDL process names; [#555](https://github.com/stnolting/neorv32/pull/555) |
+| 15.03.2023 | 1.8.2.3 | rtl reworks, cleanups and optimizations; [#550](https://github.com/stnolting/neorv32/pull/550) |
+| 11.03.2023 | 1.8.2.2 | :sparkles: add support for RISC-V `Zicond` ISA extension (conditional operations); [#546](https://github.com/stnolting/neorv32/pull/546) |
+| 10.02.2023 | 1.8.2.1 | rtl code edits, clean-ups and minor optimizations (improve branch prediction); [#545](https://github.com/stnolting/neorv32/pull/545) |
+| 10.03.2023 | [**:rocket:1.8.2**](https://github.com/stnolting/neorv32/releases/tag/v1.8.2) | **New release** |
+| 09.03.2023 | 1.8.1.10 | :warning: move tri-state drivers (ONEWIRE and TWI) out of the core; [#543](https://github.com/stnolting/neorv32/pull/543) |
+| 08.03.2023 | 1.8.1.9 | reintegrate **UART** RTS/CTS hardware flow-control; [#541](https://github.com/stnolting/neorv32/pull/541) |
+| 07.03.2023 | 1.8.1.8 | update smart LED controller **NEOLED**; [#536](https://github.com/stnolting/neorv32/pull/536) |
+| 05.03.2023 | 1.8.1.7 | :warning: rework and update **UART0 & UART1**; [#533](https://github.com/stnolting/neorv32/pull/533) |
+| 04.03.2023 | 1.8.1.6 | :warning: rework and update **SPI** module; [#530](https://github.com/stnolting/neorv32/pull/530) |
+| 02.03.2023 | 1.8.1.5 | minor general purpose timer (GPTMR) code edits; [#529](https://github.com/stnolting/neorv32/pull/529) |
+| 02.03.2023 | 1.8.1.4 | :bug: fix timeout bug in **FPU** (conversion and add/sub instructions); [#528](https://github.com/stnolting/neorv32/pull/528) |
+| 25.02.2023 | 1.8.1.3 | :sparkles: add new processor module: **Serial Data Interface (SDI)** - a SPI _device-class_ interface; [#505](https://github.com/stnolting/neorv32/pull/505) |
+| 24.02.2023 | 1.8.1.2 | :warning: rename top interface signals of **XIP** and **SIP** modules; [#504](https://github.com/stnolting/neorv32/pull/504) |
 | 23.02.2023 | 1.8.1.1 | CFS: add another 32 interface register (now having 64 memory-mapped registers for custom usage); [#503](https://github.com/stnolting/neorv32/pull/503) |
 | 23.02.2023 | [**:rocket:1.8.1**](https://github.com/stnolting/neorv32/releases/tag/v1.8.1) | **New release** |
 | 22.02.2023 | 1.8.0.10 | :warning: **remove stream link interface (SLINK)**; [#502](https://github.com/stnolting/neorv32/pull/502) |

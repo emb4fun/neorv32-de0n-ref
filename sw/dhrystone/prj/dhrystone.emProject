@@ -18,6 +18,7 @@
       arm_linker_no_warn_on_rwx_segments="Yes"
       arm_linker_variant="GNU"
       arm_rtl_variant="SEGGER"
+      arm_supply_absolute_file_path="No"
       build_generic_options_file_name=""
       build_intermediate_directory="$(Configuration)"
       build_output_directory="$(Configuration)"

@@ -4,32 +4,32 @@
 *  Copyright (c) 2023 by Michael Fischer (www.emb4fun.de).
 *  All rights reserved.
 *
-*  Redistribution and use in source and binary forms, with or without 
-*  modification, are permitted provided that the following conditions 
+*  Redistribution and use in source and binary forms, with or without
+*  modification, are permitted provided that the following conditions
 *  are met:
-*  
-*  1. Redistributions of source code must retain the above copyright 
+*
+*  1. Redistributions of source code must retain the above copyright
 *     notice, this list of conditions and the following disclaimer.
 *
 *  2. Redistributions in binary form must reproduce the above copyright
-*     notice, this list of conditions and the following disclaimer in the 
+*     notice, this list of conditions and the following disclaimer in the
 *     documentation and/or other materials provided with the distribution.
 *
-*  3. Neither the name of the author nor the names of its contributors may 
-*     be used to endorse or promote products derived from this software 
+*  3. Neither the name of the author nor the names of its contributors may
+*     be used to endorse or promote products derived from this software
 *     without specific prior written permission.
 *
-*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
-*  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
-*  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
-*  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL 
-*  THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, 
-*  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
-*  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS 
-*  OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED 
-*  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
-*  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF 
-*  THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
+*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+*  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+*  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+*  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+*  THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+*  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+*  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+*  OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+*  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+*  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+*  THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 *  SUCH DAMAGE.
 **************************************************************************/
 #define __TALCPU_COM_C__
@@ -66,17 +66,17 @@ static TAL_COM_DCB *DCBArray[TAL_COM_PORT_MAX];
 /*************************************************************************/
 static void RX_IRQHandler (TAL_COM_DCB *pDCB)
 {
-   TAL_RESULT                Error;
-   TAL_COM_HW              *pHW    = &pDCB->HW;
-   volatile neorv32_uart_t *pUARTx = (volatile neorv32_uart_t*)pHW->dBaseAddress;
-   uint8_t                  bData;
+   TAL_RESULT       Error;
+   TAL_COM_HW     *pHW    = &pDCB->HW;
+   neorv32_uart_t *pUARTx = (neorv32_uart_t*)pHW->dBaseAddress;
+   uint8_t         bData;
 
-   /* Get RX data */   
+   /* Get RX data */
    bData = (uint8_t)pUARTx->DATA & 0x000000FF;
 
    /* clear/ack pending FIRQ */
    neorv32_cpu_csr_write(CSR_MIP, ~(1<<pHW->dRXFirqPending));
-   
+
    /* If we have no overflow... */
    if (TAL_FALSE == pDCB->bRxOverflow)
    {
@@ -107,13 +107,10 @@ static void RX_IRQHandler (TAL_COM_DCB *pDCB)
 /*************************************************************************/
 static void TX_IRQHandler (TAL_COM_DCB *pDCB)
 {
-   TAL_RESULT                Error;
-   TAL_COM_HW              *pHW    = &pDCB->HW;
-   volatile neorv32_uart_t *pUARTx = (volatile neorv32_uart_t*)pHW->dBaseAddress;
-   uint8_t                  bData;
-
-   /* clear/ack pending FIRQ */
-   neorv32_cpu_csr_write(CSR_MIP, ~(1<<pHW->dTXFirqPending));
+   TAL_RESULT       Error;
+   TAL_COM_HW     *pHW    = &pDCB->HW;
+   neorv32_uart_t *pUARTx = (neorv32_uart_t*)pHW->dBaseAddress;
+   uint8_t         bData;
 
    if (1 == pHW->bTxFirqEnabled)
    {
@@ -124,12 +121,18 @@ static void TX_IRQHandler (TAL_COM_DCB *pDCB)
          /* Ups, no data available, disable interrupt */
          pHW->bTxFirqEnabled = 0;
          neorv32_cpu_csr_clr(CSR_MIE, 1 << pHW->dTXFirqEnable);
+
+         /* clear/ack pending FIRQ */
+         neorv32_cpu_csr_write(CSR_MIP, ~(1<<pHW->dTXFirqPending));
       }
       else
       {
          /* Send data */
-         pUARTx->DATA = ((uint32_t)bData) << UART_DATA_LSB;
-      }   
+         pUARTx->DATA = (uint32_t)bData;
+
+         /* clear/ack pending FIRQ */
+         neorv32_cpu_csr_write(CSR_MIP, ~(1<<pHW->dTXFirqPending));
+      }
    } /* end "TX interrupt */
 
 } /* TX_IRQHandler */
@@ -147,7 +150,7 @@ static void UART0_RX_IRQHandler (void)
 {
    TAL_CPU_IRQ_ENTER();
    RX_IRQHandler(DCBArray[TAL_COM_PORT_1]);
-   TAL_CPU_IRQ_EXIT();   
+   TAL_CPU_IRQ_EXIT();
 } /* UART0_RX_IRQHandler */
 
 /*************************************************************************/
@@ -161,9 +164,9 @@ static void UART0_RX_IRQHandler (void)
 /*************************************************************************/
 static void UART0_TX_IRQHandler (void)
 {
-   TAL_CPU_IRQ_ENTER();   
+   TAL_CPU_IRQ_ENTER();
    TX_IRQHandler(DCBArray[TAL_COM_PORT_1]);
-   TAL_CPU_IRQ_EXIT();   
+   TAL_CPU_IRQ_EXIT();
 } /* UART0_RX_IRQHandler */
 
 /*=======================================================================*/
@@ -184,7 +187,7 @@ TAL_RESULT cpu_COMInit (TAL_COM_DCB *pDCB)
 {
    TAL_RESULT    Error = TAL_ERR_COM_PORT_RANGE;
    TAL_COM_HW  *pHW    = &pDCB->HW;
-   
+
    switch (pDCB->ePort)
    {
       case TAL_COM_PORT_1:
@@ -193,7 +196,7 @@ TAL_RESULT cpu_COMInit (TAL_COM_DCB *pDCB)
          if (TAL_OK == Error)
          {
             DCBArray[TAL_COM_PORT_1] = pDCB;
-         
+
             pHW->dBaseAddress   = NEORV32_UART0_BASE;
             pHW->dRXFirqEnable  = UART0_RX_FIRQ_ENABLE;
             pHW->dTXFirqEnable  = UART0_TX_FIRQ_ENABLE;
@@ -203,14 +206,14 @@ TAL_RESULT cpu_COMInit (TAL_COM_DCB *pDCB)
          }
          break;
       } /* TAL_COM_PORT_1 */
-      
+
       default:
       {
          /* Do nothing */
          break;
       }
    } /* end switch (pDCB->ePort) */
-   
+
    return(Error);
 } /* cpu_COMInit */
 
@@ -243,17 +246,16 @@ TAL_RESULT cpu_COMIoctl (TAL_COM_DCB *pDCB, TAL_COM_IOCTL eFunc, uint32_t *pPara
 /*************************************************************************/
 TAL_RESULT cpu_COMOpen (TAL_COM_DCB *pDCB)
 {
-   TAL_RESULT                Error = TAL_ERROR;
-   TAL_COM_HW              *pHW    = &pDCB->HW;
-   volatile neorv32_uart_t *pUARTx = (volatile neorv32_uart_t*)pHW->dBaseAddress;
-   
+   TAL_RESULT       Error = TAL_ERROR;
+   TAL_COM_HW     *pHW    = &pDCB->HW;
+   neorv32_uart_t *pUARTx = (neorv32_uart_t*)pHW->dBaseAddress;
+
    uint32_t ctrl     = 0;
    uint32_t baudrate = 0;
-   uint8_t  parity   = 0;
-   
+   uint32_t irq_mask;
 
-   /* 
-    * Check parameter first 
+   /*
+    * Check parameter first
     */
 
    /* Check word length */
@@ -264,7 +266,7 @@ TAL_RESULT cpu_COMOpen (TAL_COM_DCB *pDCB)
          /* Do nothung here */
          break;
       }
-      
+
       default:
       {
          Error = TAL_ERR_COM_LENGTH;
@@ -272,28 +274,16 @@ TAL_RESULT cpu_COMOpen (TAL_COM_DCB *pDCB)
          break;   /*lint !e527*/
       }
    } /* switch (pDCB->Settings.eLength) */
-   
+
    /* Check parity settings */
    switch (pDCB->Settings.eParity)
    {
       case TAL_COM_PARITY_NONE:
       {
-         parity = PARITY_NONE;
-         break;
-      } 
-      
-      case TAL_COM_PARITY_EVEN:
-      {
-         parity = PARITY_EVEN;
+         /* Do nothing */
          break;
       }
-      
-      case TAL_COM_PARITY_ODD:
-      {
-         parity = PARITY_ODD;
-         break;
-      }
-      
+
       default:
       {
          Error = TAL_ERR_COM_PARITY;
@@ -301,7 +291,7 @@ TAL_RESULT cpu_COMOpen (TAL_COM_DCB *pDCB)
          break;   /*lint !e527*/
       }
    } /* switch (pDCB->Settings.eParity) */
-    
+
    /* Check stop bit settings */
    switch (pDCB->Settings.eStop)
    {
@@ -310,7 +300,7 @@ TAL_RESULT cpu_COMOpen (TAL_COM_DCB *pDCB)
          /* Do nothing here */
          break;
       }
-      
+
       default:
       {
          Error = TAL_ERR_COM_STOP;
@@ -321,7 +311,7 @@ TAL_RESULT cpu_COMOpen (TAL_COM_DCB *pDCB)
 
    /* Check baud rate */
    if (pDCB->Settings.dBaudrate != 0)
-   {   
+   {
       baudrate = pDCB->Settings.dBaudrate;
    }
    else
@@ -332,20 +322,19 @@ TAL_RESULT cpu_COMOpen (TAL_COM_DCB *pDCB)
 
    Error = TAL_OK;
 
+
    /* Enable and configure UART */
+   irq_mask = (1<<UART_CTRL_IRQ_RX_NEMPTY) | (1<<UART_CTRL_IRQ_TX_EMPTY);
+   neorv32_uart_setup(pUARTx, baudrate, irq_mask);
+
+   /* Install RX and TX interrupt handler */
    if (TAL_COM_PORT_1 == pDCB->ePort)
    {
-      neorv32_uart0_setup(baudrate, parity, FLOW_CONTROL_NONE);
-      
-      /* Install RX and TX interrupt handler */
       neorv32_rte_handler_install(UART0_RX_RTE_ID, UART0_RX_IRQHandler);
       neorv32_rte_handler_install(UART0_TX_RTE_ID, UART0_TX_IRQHandler);
    }
    else
    {
-//      neorv32_uart1_setup(baudrate, parity, FLOW_CONTROL_NONE);
-//      
-//      /* Install RX and TX interrupt handler */
 //      neorv32_rte_handler_install(UART1_RX_RTE_ID, UART1_RX_IRQHandler);
 //      neorv32_rte_handler_install(UART1_TX_RTE_ID, UART1_TX_IRQHandler);
    }
@@ -354,7 +343,7 @@ TAL_RESULT cpu_COMOpen (TAL_COM_DCB *pDCB)
    neorv32_cpu_csr_set(CSR_MIE, 1 << pHW->dRXFirqEnable);
 
 
-COMOpenEnd:   
+COMOpenEnd:
    return(Error);
 } /* cpu_COMOpen */
 
@@ -369,26 +358,18 @@ COMOpenEnd:
 /*************************************************************************/
 TAL_RESULT cpu_COMClose (TAL_COM_DCB *pDCB)
 {
-   TAL_RESULT                Error = TAL_OK;
-   TAL_COM_HW              *pHW    = &pDCB->HW;
-   volatile neorv32_uart_t *pUARTx = (volatile neorv32_uart_t*)pHW->dBaseAddress;
+   TAL_RESULT       Error = TAL_OK;
+   TAL_COM_HW     *pHW    = &pDCB->HW;
+   neorv32_uart_t *pUARTx = (neorv32_uart_t*)pHW->dBaseAddress;
 
    /* Disable UART and RX and TX interrupt */
-   if (TAL_COM_PORT_1 == pDCB->ePort)
-   {
-      neorv32_uart0_disable();   
-      neorv32_cpu_csr_clr(CSR_MIE, 1 << UART0_RX_FIRQ_ENABLE);
-      neorv32_cpu_csr_clr(CSR_MIE, 1 << UART0_TX_FIRQ_ENABLE);
-   }
-   else
-   {
-      neorv32_uart1_disable();   
-      neorv32_cpu_csr_clr(CSR_MIE, 1 << UART1_RX_FIRQ_ENABLE);
-      neorv32_cpu_csr_clr(CSR_MIE, 1 << UART1_TX_FIRQ_ENABLE);
-   }
-   
-   pUARTx->CTRL = 0;      
-   
+   neorv32_uart_disable(pUARTx);
+
+   neorv32_cpu_csr_clr(CSR_MIE, (1 << pHW->dRXFirqEnable));
+   neorv32_cpu_csr_clr(CSR_MIE, (1 << pHW->dTXFirqEnable));
+
+   pUARTx->CTRL = 0;
+
    return(Error);
 } /* cpu_COMClose */
 
@@ -403,10 +384,10 @@ TAL_RESULT cpu_COMClose (TAL_COM_DCB *pDCB)
 /*************************************************************************/
 TAL_RESULT cpu_COMStartTx (TAL_COM_DCB *pDCB)
 {
-   TAL_RESULT                Error = TAL_OK;
-   TAL_COM_HW              *pHW    = &pDCB->HW;
-   volatile neorv32_uart_t *pUARTx = (volatile neorv32_uart_t*)pHW->dBaseAddress;
-   uint8_t                  bData;
+   TAL_RESULT       Error = TAL_OK;
+   TAL_COM_HW     *pHW    = &pDCB->HW;
+   neorv32_uart_t *pUARTx = (neorv32_uart_t*)pHW->dBaseAddress;
+   uint8_t         bData;
 
    TAL_CPU_DISABLE_ALL_INTS();
    if (1 == pHW->bTxFirqEnabled)
@@ -420,16 +401,16 @@ TAL_RESULT cpu_COMStartTx (TAL_COM_DCB *pDCB)
       if (TAL_OK == Error)
       {
          /* Send data */
-         pUARTx->DATA = ((uint32_t)bData) << UART_DATA_LSB;
-      
+         pUARTx->DATA = (uint32_t)bData;
+
          /* Enable TX interrupt */
          neorv32_cpu_csr_set(CSR_MIE, 1 << pHW->dTXFirqEnable);
-         
+
          pHW->bTxFirqEnabled = 1;
       }
    }
    TAL_CPU_ENABLE_ALL_INTS();
-   
+
    return(Error);
 } /* cpu_COMStartTx */
 
@@ -444,10 +425,10 @@ TAL_RESULT cpu_COMStartTx (TAL_COM_DCB *pDCB)
 /*************************************************************************/
 TAL_RESULT cpu_COMTxIsRunning (TAL_COM_DCB *pDCB)
 {
-   TAL_RESULT                Error = TAL_OK;
-   TAL_COM_HW              *pHW    = &pDCB->HW;
-   volatile neorv32_uart_t *pUARTx = (volatile neorv32_uart_t*)pHW->dBaseAddress;
-   
+   TAL_RESULT       Error = TAL_OK;
+   TAL_COM_HW     *pHW    = &pDCB->HW;
+   neorv32_uart_t *pUARTx = (neorv32_uart_t*)pHW->dBaseAddress;
+
    TAL_CPU_DISABLE_ALL_INTS();
    if (1 == pHW->bTxFirqEnabled)
    {
@@ -460,7 +441,7 @@ TAL_RESULT cpu_COMTxIsRunning (TAL_COM_DCB *pDCB)
       Error = TAL_ERROR;
    }
    TAL_CPU_ENABLE_ALL_INTS();
-   
+
    return(Error);
 } /* cpu_COMTxIsRunning */
 
@@ -478,6 +459,6 @@ void cpu_COMSendStringASS (TAL_COM_DCB *pDCB, char *pString)
    (void)pDCB;
    (void)pString;
 
-} /* cpu_COMSendStringASS */  
+} /* cpu_COMSendStringASS */
 
 /*** EOF ***/

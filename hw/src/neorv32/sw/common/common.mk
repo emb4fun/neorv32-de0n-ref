@@ -86,7 +86,7 @@ CORE_SRC  = $(wildcard $(NEORV32_SRC_PATH)/*.c)
 CORE_SRC += $(NEORV32_COM_PATH)/crt0.S
 
 # Linker script
-LD_SCRIPT = $(NEORV32_COM_PATH)/neorv32.ld
+LD_SCRIPT ?= $(NEORV32_COM_PATH)/neorv32.ld
 
 # Main output files
 APP_EXE  = neorv32_exe.bin
@@ -117,6 +117,7 @@ CC      = $(RISCV_PREFIX)gcc
 OBJDUMP = $(RISCV_PREFIX)objdump
 OBJCOPY = $(RISCV_PREFIX)objcopy
 SIZE    = $(RISCV_PREFIX)size
+GDB     = $(RISCV_PREFIX)gdb
 
 # Host native compiler
 CC_X86 = gcc -Wall -O -g
@@ -126,8 +127,10 @@ IMAGE_GEN = $(NEORV32_EXG_PATH)/image_gen
 
 # Compiler & linker flags
 CC_OPTS  = -march=$(MARCH) -mabi=$(MABI) $(EFFORT) -Wall -ffunction-sections -fdata-sections -nostartfiles -mno-fdiv
-CC_OPTS += -Wl,--gc-sections -lm -lc -lgcc -lc -g
+CC_OPTS += -g -Wl,--gc-sections
 CC_OPTS += $(USER_FLAGS)
+LD_LIBS =  -lm -lc -lgcc
+LD_LIBS += $(USER_LIBS)
 
 
 # -----------------------------------------------------------------------------
@@ -184,7 +187,7 @@ $(IMAGE_GEN): $(NEORV32_EXG_PATH)/image_gen.c
 
 # Link object files and show memory utilization
 $(APP_ELF): $(OBJ)
-	@$(CC) $(CC_OPTS) -T $(LD_SCRIPT) $(OBJ) -o $@ -lm
+	@$(CC) $(CC_OPTS) -T $(LD_SCRIPT) $(OBJ) $(LD_LIBS) -o $@
 	@echo "Memory utilization:"
 	@$(SIZE) $(APP_ELF)
 
@@ -295,10 +298,17 @@ elf_info: $(APP_ELF)
 
 
 # -----------------------------------------------------------------------------
+# Run GDB
+# -----------------------------------------------------------------------------
+gdb: 
+	@$(GDB)
+
+
+# -----------------------------------------------------------------------------
 # Clean up
 # -----------------------------------------------------------------------------
 clean:
-	@rm -f *.elf *.o *.bin *.out *.asm *.vhd *.hex
+	@rm -f *.elf *.o *.bin *.out *.asm *.vhd *.hex .gdb_history
 
 clean_all: clean
 	@rm -f $(OBJ) $(IMAGE_GEN)
@@ -332,6 +342,7 @@ info:
 	@echo "OBJDUMP:    $(OBJDUMP)"
 	@echo "OBJCOPY:    $(OBJCOPY)"
 	@echo "SIZE:       $(SIZE)"
+	@echo "DEBUGGER:   $(GDB)"
 	@echo "---------------- Info: Compiler Configuration ----------------"
 	@$(CC) -v
 	@echo "---------------- Info: Compiler Libraries ----------------"
@@ -342,6 +353,9 @@ info:
 	@echo "---------------- Info: Flags ----------------"
 	@echo "USER_FLAGS: $(USER_FLAGS)"
 	@echo "CC_OPTS:    $(CC_OPTS)"
+	@echo "---------------- Info: Libraries ----------------"
+	@echo "USER_LIBS: $(USER_LIBS)"
+	@echo "LD_LIBS:   $(LD_LIBS)"
 	@echo "---------------- Info: Host Native GCC Flags ----------------"
 	@echo "CC_X86:     $(CC_X86)"
 
@@ -357,6 +371,7 @@ help:
 	@echo " help       - show this text"
 	@echo " check      - check toolchain"
 	@echo " info       - show makefile/toolchain configuration"
+	@echo " gdb        - run GNU debugger"
 	@echo " asm        - compile and generate <$(APP_ASM)> assembly listing file for manual debugging"
 	@echo " elf        - compile and generate <$(APP_ELF)> ELF file"
 	@echo " exe        - compile and generate <$(APP_EXE)> executable for upload via default bootloader (binary file, with header)"
@@ -374,6 +389,7 @@ help:
 	@echo ""
 	@echo "=== Variables ==="
 	@echo " USER_FLAGS   - Custom toolchain flags [append only]: \"$(USER_FLAGS)\""
+	@echo " USER_LIBS    - Custom libraries [append only]: \"$(USER_LIBS)\""
 	@echo " EFFORT       - Optimization level: \"$(EFFORT)\""
 	@echo " MARCH        - Machine architecture: \"$(MARCH)\""
 	@echo " MABI         - Machine binary interface: \"$(MABI)\""

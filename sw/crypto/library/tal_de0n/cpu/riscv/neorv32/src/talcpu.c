@@ -4,32 +4,32 @@
 *  Copyright (c) 2023 by Michael Fischer (www.emb4fun.de).
 *  All rights reserved.
 *
-*  Redistribution and use in source and binary forms, with or without 
-*  modification, are permitted provided that the following conditions 
+*  Redistribution and use in source and binary forms, with or without
+*  modification, are permitted provided that the following conditions
 *  are met:
-*  
-*  1. Redistributions of source code must retain the above copyright 
+*
+*  1. Redistributions of source code must retain the above copyright
 *     notice, this list of conditions and the following disclaimer.
 *
 *  2. Redistributions in binary form must reproduce the above copyright
-*     notice, this list of conditions and the following disclaimer in the 
+*     notice, this list of conditions and the following disclaimer in the
 *     documentation and/or other materials provided with the distribution.
 *
-*  3. Neither the name of the author nor the names of its contributors may 
-*     be used to endorse or promote products derived from this software 
+*  3. Neither the name of the author nor the names of its contributors may
+*     be used to endorse or promote products derived from this software
 *     without specific prior written permission.
 *
-*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
-*  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
-*  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
-*  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL 
-*  THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, 
-*  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
-*  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS 
-*  OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED 
-*  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
-*  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF 
-*  THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
+*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+*  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+*  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+*  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+*  THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+*  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+*  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+*  OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+*  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+*  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+*  THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 *  SUCH DAMAGE.
 **************************************************************************/
 #define __TALCPU_C__
@@ -64,14 +64,14 @@ static uint32_t dHiResPeriod = 0;
 static void SysTick_Handler (void)
 {
    TAL_CPU_IRQ_ENTER();
-   
+
    /* clear/ack pending FIRQ */
    neorv32_cpu_csr_write(CSR_MIP, ~(1<<GPTMR_FIRQ_PENDING));
-   
-   OS_TimerCallback();   
-   
-   TAL_CPU_IRQ_EXIT();   
-} /* SysTick_Handler */ 
+
+   OS_TimerCallback();
+
+   TAL_CPU_IRQ_EXIT();
+} /* SysTick_Handler */
 
 /*=======================================================================*/
 /*  All code exported                                                    */
@@ -100,24 +100,24 @@ void tal_CPUInit (void)
        * this is not required, but keeps us safe.
        */
       neorv32_rte_setup();
-      
+
       /* Enable and configure primary UART (UART0). */
-      neorv32_uart0_setup(19200, PARITY_NONE, FLOW_CONTROL_NONE);
+      neorv32_uart_setup(NEORV32_UART0, TERM_COM_SPEED, 0);
 
       /* Check if GPIO unit is implemented at all */
-      if (0 == neorv32_gpio_available()) 
+      if (0 == neorv32_gpio_available())
       {
          rc = -1;
-         neorv32_uart0_puts("\r\nError! No GPIO unit synthesized!\r\n");
+         neorv32_uart_puts(NEORV32_UART0, "\r\nError! No GPIO unit synthesized!\r\n");
       }
 
       /* Check if GPTMR unit is implemented at all */
       if (0 == neorv32_gptmr_available())
       {
          rc = -1;
-         neorv32_uart0_puts("\r\nERROR! General purpose timer not implemented!\r\n");
+         neorv32_uart_puts(NEORV32_UART0, "\r\nERROR! General purpose timer not implemented!\r\n");
       }
-      
+
       if (rc != 0)
       {
          /* Error */
@@ -142,14 +142,14 @@ void tal_CPUInit (void)
 void tal_CPUSysTickStart (void)
 {
    uint32_t ticks;
-   
+
    /* Install GPTMR interrupt handler */
    neorv32_rte_handler_install(GPTMR_RTE_ID, SysTick_Handler);
 
-   ticks = ((NEORV32_SYSINFO.CLK / 2) / OS_TICKS_PER_SECOND);
+   ticks = ((NEORV32_SYSINFO->CLK / 2) / OS_TICKS_PER_SECOND);
 
-   /* 
-    * The divider for the CPU was chosen so that 
+   /*
+    * The divider for the CPU was chosen so that
     * the ticks are no larger than 16 bits.
     */
    dHiResPeriod = ticks;
@@ -157,16 +157,16 @@ void tal_CPUSysTickStart (void)
    /* Configure timer for 1000Hz ticks in continuous mode (with clock divisor = 2) */
    neorv32_gptmr_setup(CLK_PRSC_2, 1, ticks - 1);
 
-   /* 
-    * Enable interrupt 
+   /*
+    * Enable interrupt
     */
-  
+
    /* Enable GPTMR FIRQ channel */
    neorv32_cpu_csr_set(CSR_MIE, 1 << GPTMR_FIRQ_ENABLE);
-   
+
    /* Enable machine-mode interrupts */
    neorv32_cpu_csr_set(CSR_MSTATUS, 1 << CSR_MSTATUS_MIE);
-   
+
 } /* tal_CPUSysTickStart */
 
 /*************************************************************************/
@@ -198,14 +198,14 @@ uint32_t tal_CPUStatGetHiResCnt (void)
 
    /* Get milliseconds */
    dValue = (OS_TimeGet() << 16);
-   
-   /* 
-    * The COUNT register of the GPTMR is incrementing up to the threshold 
+
+   /*
+    * The COUNT register of the GPTMR is incrementing up to the threshold
     * register (THRES). And the threshold was chosen to fit in a 16 bit
-    * register. Therefore the count register will fit in 16 bit too. 
-    */   
-   dValue |= (uint16_t)(NEORV32_GPTMR.COUNT & 0x0000FFFF);
-   
+    * register. Therefore the count register will fit in 16 bit too.
+    */
+   dValue |= (uint16_t)(NEORV32_GPTMR->COUNT & 0x0000FFFF);
+
    return(dValue);
 } /* tal_CPUStatGetHiResCnt */
 
@@ -220,7 +220,7 @@ uint32_t tal_CPUStatGetHiResCnt (void)
 /*************************************************************************/
 uint32_t tal_CPUGetFrequencyCPU (void)
 {
-   return(NEORV32_SYSINFO.CLK);
+   return(NEORV32_SYSINFO->CLK);
 } /* tal_CPUGetFrequencyCPU */
 
 /*************************************************************************/
@@ -235,18 +235,18 @@ uint32_t tal_CPUGetFrequencyCPU (void)
 void tal_CPURngInit (void)
 {
    static uint8_t bInitDone = 0;
-   
+
    if (0 == bInitDone)
    {
       /* Check if TRNG unit is implemented at all */
-      if (neorv32_trng_available() == 0) 
+      if (neorv32_trng_available() == 0)
       {
          neorv32_uart0_printf("No TRNG implemented.\n");
       }
       else
       {
          /* Check if TRNG is using simulation mode */
-         if (neorv32_trng_check_sim_mode() != 0) 
+         if (neorv32_trng_check_sim_mode() != 0)
          {
             neorv32_uart0_printf("WARNING! TRNG uses simulation-only mode implementing a pseudo-RNG (LFSR)\n");
             neorv32_uart0_printf("         instead of the physical entropy sources!\n");
@@ -254,7 +254,7 @@ void tal_CPURngInit (void)
 
          /* enable TRNG */
          neorv32_trng_enable();
-      
+
          bInitDone = 1;
       }
    }
@@ -288,8 +288,8 @@ TAL_RESULT tal_CPURngHardwarePoll (uint8_t *pData, uint32_t dSize)
    TAL_RESULT  Error = TAL_OK;
    int         rc;
    uint8_t    bData;
-   uint32_t   dCount; 
-   
+   uint32_t   dCount;
+
    for (dCount = 0; dCount < dSize; dCount++)
    {
       rc = neorv32_trng_get(&bData);
@@ -303,10 +303,49 @@ TAL_RESULT tal_CPURngHardwarePoll (uint8_t *pData, uint32_t dSize)
          Error = TAL_ERROR;
          break;
       }
-   }   
+   }
 
-   return(Error);   
+   return(Error);
 } /* tal_CPURngHardwarePoll */
+
+/*************************************************************************/
+/*  tal_CPUInitHWDog                                                     */
+/*                                                                       */
+/*  Initialize the Hardware Watchdog.                                    */
+/*                                                                       */
+/*  In    : none                                                         */
+/*  Out   : none                                                         */
+/*  Return: none                                                         */
+/*************************************************************************/
+void tal_CPUInitHWDog (void)
+{
+   uint32_t       dTimeoutSec;
+   static uint8_t bInitDone = 0;
+
+   if ((0 == bInitDone) && (neorv32_wdt_available() != 0))
+   {
+      bInitDone = 1;
+
+      dTimeoutSec = 1 * (NEORV32_SYSINFO->CLK / 4096);
+      neorv32_wdt_setup(dTimeoutSec, 0, 0, 1);
+   }
+
+} /* tal_CPUInitHWDog */
+
+/*************************************************************************/
+/*  Name  : tal_CPUTriggerHWDog                                          */
+/*                                                                       */
+/*  Trigger the Hardware Watchdog here.                                  */
+/*                                                                       */
+/*  In    : none                                                         */
+/*  Out   : none                                                         */
+/*  Return: none                                                         */
+/*************************************************************************/
+void tal_CPUTriggerHWDog (void)
+{
+   // TODO...
+} /* tal_CPUTriggerHWDog */
+
 
 /*************************************************************************/
 /*  tal_CPUReboot                                                        */
@@ -325,9 +364,7 @@ void tal_CPUReboot (void)
    /*
     * Init watchdog, if not done before
     */
-#if 0
    tal_CPUInitHWDog();
-#endif   
 
    /*
     * Wait for watchdog reset
@@ -338,7 +375,7 @@ void tal_CPUReboot (void)
       __asm__ volatile ("nop");
    }
    TAL_CPU_ENABLE_ALL_INTS(); /*lint !e527*/
-   
+
 } /* tal_CPUReboot */
 
 /*** EOF ***/

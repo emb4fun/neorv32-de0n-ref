@@ -108,23 +108,24 @@ see the [_open-source architecture ID list_](https://github.com/riscv/riscv-isa-
 * configurable ISA extensions:
 \
 `RV32`
-[[`I`](https://stnolting.github.io/neorv32/#_i_base_integer_isa)/
-[`E`](https://stnolting.github.io/neorv32/#_e_embedded_cpu)]
-[[`B`](https://stnolting.github.io/neorv32/#_b_bit_manipulation_operations)]
-[[`C`](https://stnolting.github.io/neorv32/#_c_compressed_instructions)]
-[[`M`](https://stnolting.github.io/neorv32/#_m_integer_multiplication_and_division)]
-[[`U`](https://stnolting.github.io/neorv32/#_u_less_privileged_user_mode)]
-[[`X`](https://stnolting.github.io/neorv32/#_x_neorv32_specific_custom_extensions)]
-[[`Zicsr`](https://stnolting.github.io/neorv32/#_zicsr_control_and_status_register_access_privileged_architecture)]
-[[`Zicntr`](https://stnolting.github.io/neorv32/#_zicntr_cpu_base_counters)]
-[[`Zihpm`](https://stnolting.github.io/neorv32/#_zihpm_hardware_performance_monitors)]
-[[`Zifencei`](https://stnolting.github.io/neorv32/#_zifencei_instruction_stream_synchronization)]
-[[`Zfinx`](https://stnolting.github.io/neorv32/#_zfinx_single_precision_floating_point_operations)]
-[[`Zmmul`](https://stnolting.github.io/neorv32/#_zmmul_integer_multiplication)]
-[[`Zxcfu`](https://stnolting.github.io/neorv32/#_zxcfu_custom_instructions_extension_cfu)]
-[[`PMP`](https://stnolting.github.io/neorv32/#_pmp_physical_memory_protection)]
-[[`Sdext`](https://stnolting.github.io/neorv32/#_sdext_external_debug_support)]
-[[`Sdtrig`](https://stnolting.github.io/neorv32/#_sdtrig_trigger_module)]
+[[`I`](https://stnolting.github.io/neorv32/#_i_isa_extension)/
+[`E`](https://stnolting.github.io/neorv32/#_e_isa_extension)]
+[[`B`](https://stnolting.github.io/neorv32/#_b_isa_extension)]
+[[`C`](https://stnolting.github.io/neorv32/#_c_isa_extension)]
+[[`M`](https://stnolting.github.io/neorv32/#_m_isa_extension)]
+[[`U`](https://stnolting.github.io/neorv32/#_u_isa_extension)]
+[[`X`](https://stnolting.github.io/neorv32/#_x_isa_extension)]
+[[`Zicntr`](https://stnolting.github.io/neorv32/#_zicntr_isa_extension)]
+[[`Zicsr`](https://stnolting.github.io/neorv32/#_zicsr_isa_extension)]
+[[`Zicond`](https://stnolting.github.io/neorv32/#_zicond_isa_extension)]
+[[`Zihpm`](https://stnolting.github.io/neorv32/#_zihpm_isa_extension)]
+[[`Zifencei`](https://stnolting.github.io/neorv32/#_zifencei_isa_extension)]
+[[`Zfinx`](https://stnolting.github.io/neorv32/#_zfinx_isa_extension)]
+[[`Zmmul`](https://stnolting.github.io/neorv32/#_zmmul_isa_extension)]
+[[`Zxcfu`](https://stnolting.github.io/neorv32/#_zxcfu_isa_extension)]
+[[`PMP`](https://stnolting.github.io/neorv32/#_pmp_isa_extension)]
+[[`Sdext`](https://stnolting.github.io/neorv32/#_sdext_isa_extension)]
+[[`Sdtrig`](https://stnolting.github.io/neorv32/#_sdtrig_isa_extension)]
 * compatible to subsets of the RISC-V
 *Unprivileged ISA Specification* ([pdf](https://github.com/stnolting/neorv32/blob/main/docs/references/riscv-spec.pdf))
 and *Privileged Architecture Specification* ([pdf](https://github.com/stnolting/neorv32/blob/main/docs/references/riscv-privileged.pdf)).
@@ -133,13 +134,14 @@ and *Privileged Architecture Specification* ([pdf](https://github.com/stnolting/
 * 16 fast interrupt request channels as NEORV32-specific extension
 * custom functions unit ([CFU](https://stnolting.github.io/neorv32/#_custom_functions_unit_cfu) as `Zxcfu` ISA extension)
 for _custom RISC-V instructions_ (R3-type, R4-type and R5-type);
-* _intrinsic_ libraries for the `Zxcfu` and `Zfinx` ISA extensions
+* _intrinsic_ libraries for the `Zicond`, `Zfinx` and `Zxcfu` ISA extensions
 
 **Memories**
 
 * processor-internal data and instruction memories ([DMEM](https://stnolting.github.io/neorv32/#_data_memory_dmem) /
 [IMEM](https://stnolting.github.io/neorv32/#_instruction_memory_imem)) &
-cache ([iCACHE](https://stnolting.github.io/neorv32/#_processor_internal_instruction_cache_icache))
+caches ([iCACHE](https://stnolting.github.io/neorv32/#_processor_internal_instruction_cache_icache) and
+[dCACHE](https://stnolting.github.io/neorv32/#_processor_internal_data_cache_dcache))
 * pre-installed bootloader ([BOOTLDROM](https://stnolting.github.io/neorv32/#_bootloader_rom_bootrom)) with serial user interface;
 allows booting application code via UART or from external SPI flash
 
@@ -153,7 +155,8 @@ allows booting application code via UART or from external SPI flash
 
 * standard serial interfaces
 ([UART](https://stnolting.github.io/neorv32/#_primary_universal_asynchronous_receiver_and_transmitter_uart0),
-[SPI](https://stnolting.github.io/neorv32/#_serial_peripheral_interface_controller_spi),
+[SPI](https://stnolting.github.io/neorv32/#_serial_peripheral_interface_controller_spi) (host),
+[SDI](https://stnolting.github.io/neorv32/#_serial_data_interface_controller_sdi) (SPI device),
 [TWI/I²C](https://stnolting.github.io/neorv32/#_two_wire_serial_interface_controller_twi)),
 [ONEWIRE/1-Wire](https://stnolting.github.io/neorv32/#_one_wire_serial_interface_controller_onewire))
 * general purpose IOs ([GPIO](https://stnolting.github.io/neorv32/#_general_purpose_input_and_output_port_gpio)) and
@@ -163,7 +166,7 @@ allows booting application code via UART or from external SPI flash
 **SoC Connectivity**
 
 * 32-bit external bus interface - Wishbone b4 compatible
-([WISHBONE](https://stnolting.github.io/neorv32/#_processor_external_memory_interface_wishbone_axi4_lite));
+([WISHBONE](https://stnolting.github.io/neorv32/#_processor_external_memory_interface_wishbone));
 [wrappers](https://github.com/stnolting/neorv32/blob/main/rtl/system_integration) for AXI4-Lite and Avalon-MM host interfaces
 * external interrupts controller with up to 32 channels
 ([XIRQ](https://stnolting.github.io/neorv32/#_external_interrupt_controller_xirq))

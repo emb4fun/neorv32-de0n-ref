@@ -51,7 +51,7 @@
  **************************************************************************/
 int neorv32_xip_available(void) {
 
-  if (NEORV32_SYSINFO.SOC & (1 << SYSINFO_SOC_IO_XIP)) {
+  if (NEORV32_SYSINFO->SOC & (1 << SYSINFO_SOC_IO_XIP)) {
     return 1;
   }
   else {
@@ -70,21 +70,15 @@ int neorv32_xip_available(void) {
  * @param[in] cpol SPI clock polarity (0/1).
  * @param[in] cpha SPI clock phase(0/1).
  * @param[in] rd_cmd SPI flash read byte command.
- * @return 0 if configuration is OK, -1 if configuration error.
  **************************************************************************/
-int neorv32_xip_setup(uint8_t prsc, uint8_t cpol, uint8_t cpha, uint8_t rd_cmd) {
-
-  // configuration check
-  if ((prsc > 7) || (cpol > 1) || (cpha > 1)) {
-    return -1;
-  }
+void neorv32_xip_setup(int prsc, int cpol, int cpha, uint8_t rd_cmd) {
 
   // reset and disable module
-  NEORV32_XIP.CTRL = 0;
+  NEORV32_XIP->CTRL = 0;
 
   // clear data registers
-  NEORV32_XIP.DATA_LO = 0;
-  NEORV32_XIP.DATA_HI = 0; // will not trigger SPI transfer since module is disabled
+  NEORV32_XIP->DATA_LO = 0;
+  NEORV32_XIP->DATA_HI = 0; // will not trigger SPI transfer since module is disabled
 
   uint32_t ctrl = 0;
   ctrl |= ((uint32_t)(1            )) << XIP_CTRL_EN; // enable module
@@ -94,18 +88,16 @@ int neorv32_xip_setup(uint8_t prsc, uint8_t cpol, uint8_t cpha, uint8_t rd_cmd) 
   ctrl |= ((uint32_t)(8            )) << XIP_CTRL_SPI_NBYTES_LSB; // set 8 bytes transfer size as default
   ctrl |= ((uint32_t)(rd_cmd & 0xff)) << XIP_CTRL_RD_CMD_LSB;
 
-  NEORV32_XIP.CTRL = ctrl;
+  NEORV32_XIP->CTRL = ctrl;
 
   // send 64 SPI dummy clocks but without an active CS
-  NEORV32_XIP.DATA_LO = 0;
-  NEORV32_XIP.DATA_HI = 0; // trigger SPI transfer
+  NEORV32_XIP->DATA_LO = 0;
+  NEORV32_XIP->DATA_HI = 0; // trigger SPI transfer
 
   // wait for transfer to complete
-  while (NEORV32_XIP.CTRL & (1 << XIP_CTRL_PHY_BUSY)); // direct SPI mode -> check PHY status
+  while (NEORV32_XIP->CTRL & (1 << XIP_CTRL_PHY_BUSY)); // direct SPI mode -> check PHY status
 
-  NEORV32_XIP.CTRL |= 1 << XIP_CTRL_SPI_CSEN; // finally enable automatic SPI chip-select
-
-  return 0;
+  NEORV32_XIP->CTRL |= 1 << XIP_CTRL_SPI_CSEN; // finally enable automatic SPI chip-select
 }
 
 
@@ -116,7 +108,7 @@ int neorv32_xip_setup(uint8_t prsc, uint8_t cpol, uint8_t cpha, uint8_t rd_cmd) 
  * @param[in] page_base XIP memory page base address (top 4 address bits, 0..15).
  * @return 0 if XIP configuration is OK, -1 if configuration error.
  **************************************************************************/
-int neorv32_xip_start(uint8_t abytes, uint32_t page_base) {
+int neorv32_xip_start(int abytes, uint32_t page_base) {
 
   if ((abytes < 1) || (abytes > 4)) {
     return -1;
@@ -127,7 +119,7 @@ int neorv32_xip_start(uint8_t abytes, uint32_t page_base) {
   }
   page_base >>= 28;
 
-  uint32_t ctrl = NEORV32_XIP.CTRL;
+  uint32_t ctrl = NEORV32_XIP->CTRL;
 
   // address bytes send to SPI flash
   ctrl &= ~(3 << XIP_CTRL_XIP_ABYTES_LSB); // clear old configuration
@@ -144,7 +136,7 @@ int neorv32_xip_start(uint8_t abytes, uint32_t page_base) {
 
   ctrl |= 1 << XIP_CTRL_XIP_EN; // enable XIP mode
 
-  NEORV32_XIP.CTRL = ctrl;
+  NEORV32_XIP->CTRL = ctrl;
 
   return 0;
 }
@@ -157,7 +149,7 @@ int neorv32_xip_start(uint8_t abytes, uint32_t page_base) {
  **************************************************************************/
 void neorv32_xip_highspeed_enable(void) {
 
-  NEORV32_XIP.CTRL |= 1 << XIP_CTRL_HIGHSPEED;
+  NEORV32_XIP->CTRL |= 1 << XIP_CTRL_HIGHSPEED;
 }
 
 
@@ -166,7 +158,7 @@ void neorv32_xip_highspeed_enable(void) {
  **************************************************************************/
 void neorv32_xip_highspeed_disable(void) {
 
-  NEORV32_XIP.CTRL &= ~(1 << XIP_CTRL_HIGHSPEED);
+  NEORV32_XIP->CTRL &= ~(1 << XIP_CTRL_HIGHSPEED);
 }
 
 
@@ -177,7 +169,7 @@ void neorv32_xip_highspeed_disable(void) {
  **************************************************************************/
 void neorv32_xip_burst_mode_enable(void) {
 
-  NEORV32_XIP.CTRL |= 1 << XIP_CTRL_BURST_EN;
+  NEORV32_XIP->CTRL |= 1 << XIP_CTRL_BURST_EN;
 }
 
 
@@ -186,7 +178,7 @@ void neorv32_xip_burst_mode_enable(void) {
  **************************************************************************/
 void neorv32_xip_burst_mode_disable(void) {
 
-  NEORV32_XIP.CTRL &= ~(1 << XIP_CTRL_BURST_EN);
+  NEORV32_XIP->CTRL &= ~(1 << XIP_CTRL_BURST_EN);
 }
 
 
@@ -200,17 +192,13 @@ void neorv32_xip_burst_mode_disable(void) {
  * @param[in,out] rtx_data Pointer to 64-bit TX/RX data (MSB-aligned for sending, LSB-aligned for receiving (only 32-bit)).
  * @return 0 if valid transfer, 1 if transfer configuration error.
  **************************************************************************/
-int neorv32_xip_spi_trans(uint8_t nbytes, uint64_t *rtx_data) {
-
-  if ((nbytes == 0) || (nbytes > 8)) {
-    return 1;
-  }
+void neorv32_xip_spi_trans(int nbytes, uint64_t *rtx_data) {
 
   // configure number of bytes to transfer
-  uint32_t ctrl = NEORV32_XIP.CTRL;
+  uint32_t ctrl = NEORV32_XIP->CTRL;
   ctrl &= ~(0xF << XIP_CTRL_SPI_NBYTES_LSB); // clear old configuration
   ctrl |= nbytes << XIP_CTRL_SPI_NBYTES_LSB; // set new configuration
-  NEORV32_XIP.CTRL = ctrl;
+  NEORV32_XIP->CTRL = ctrl;
 
   union {
     uint64_t uint64;
@@ -218,15 +206,13 @@ int neorv32_xip_spi_trans(uint8_t nbytes, uint64_t *rtx_data) {
   } data;
 
   data.uint64 = *rtx_data;
-  NEORV32_XIP.DATA_LO = data.uint32[0];
-  NEORV32_XIP.DATA_HI = data.uint32[1]; // trigger SPI transfer
+  NEORV32_XIP->DATA_LO = data.uint32[0];
+  NEORV32_XIP->DATA_HI = data.uint32[1]; // trigger SPI transfer
 
   // wait for transfer to complete
-  while (NEORV32_XIP.CTRL & (1 << XIP_CTRL_PHY_BUSY)); // direct SPI mode -> check PHY status
+  while (NEORV32_XIP->CTRL & (1 << XIP_CTRL_PHY_BUSY)); // direct SPI mode -> check PHY status
 
-  data.uint32[0] = NEORV32_XIP.DATA_LO; // RX data is always 32-bit and LSB-aligned
+  data.uint32[0] = NEORV32_XIP->DATA_LO; // RX data is always 32-bit and LSB-aligned
   data.uint32[1] = 0;
   *rtx_data = data.uint64;
-
-  return 0;
 }

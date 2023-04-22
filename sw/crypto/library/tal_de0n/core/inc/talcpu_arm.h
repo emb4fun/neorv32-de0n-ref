@@ -59,7 +59,6 @@
 #define TAL_CPU_IRQ_EXIT()    /* Do not enable the INT here */
 #endif
 
-
 #if defined(RTOS_UCOS3)
 #define TAL_CPU_IRQ_ENTER()   {                                                           \
                                  CPU_SR_ALLOC();                                          \

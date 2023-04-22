@@ -3,7 +3,7 @@
 // # ********************************************************************************************* #
 // # BSD 3-Clause License                                                                          #
 // #                                                                                               #
-// # Copyright (c) 2022, Stephan Nolting. All rights reserved.                                     #
+// # Copyright (c) 2023, Stephan Nolting. All rights reserved.                                     #
 // #                                                                                               #
 // # Redistribution and use in source and binary forms, with or without modification, are          #
 // # permitted provided that the following conditions are met:                                     #
@@ -51,7 +51,7 @@
  **************************************************************************/
 int neorv32_spi_available(void) {
 
-  if (NEORV32_SYSINFO.SOC & (1 << SYSINFO_SOC_IO_SPI)) {
+  if (NEORV32_SYSINFO->SOC & (1 << SYSINFO_SOC_IO_SPI)) {
     return 1;
   }
   else {
@@ -67,23 +67,21 @@ int neorv32_spi_available(void) {
  * @prama[in] cdiv Clock divider (0..15).
  * @param[in] clk_phase Clock phase (0=sample on rising edge, 1=sample on falling edge).
  * @param[in] clk_polarity Clock polarity (when idle).
- * @param[in] data_size Data transfer size (0: 8-bit, 1: 16-bit, 2: 24-bit, 3: 32-bit).
- * @param[in] irq_config Interrupt configuration (0,1: PHY transfer done, 2: TX FIFO becomes less than half full, 3: TX FIFO becomes empty).
+ * @param[in] irq_mask Interrupt configuration mask (CTRL's irq_* bits).
  **************************************************************************/
-void neorv32_spi_setup(int prsc, int cdiv, int clk_phase, int clk_polarity, int data_size, int irq_config) {
+void neorv32_spi_setup(int prsc, int cdiv, int clk_phase, int clk_polarity, uint32_t irq_mask) {
 
-  NEORV32_SPI.CTRL = 0; // reset
+  NEORV32_SPI->CTRL = 0; // reset
 
   uint32_t tmp = 0;
   tmp |= (uint32_t)(1            & 0x01) << SPI_CTRL_EN;
   tmp |= (uint32_t)(clk_phase    & 0x01) << SPI_CTRL_CPHA;
   tmp |= (uint32_t)(clk_polarity & 0x01) << SPI_CTRL_CPOL;
-  tmp |= (uint32_t)(data_size    & 0x03) << SPI_CTRL_SIZE0;
   tmp |= (uint32_t)(prsc         & 0x07) << SPI_CTRL_PRSC0;
   tmp |= (uint32_t)(cdiv         & 0x0f) << SPI_CTRL_CDIV0;
-  tmp |= (uint32_t)(irq_config   & 0x03) << SPI_CTRL_IRQ0;
+  tmp |= (uint32_t)(irq_mask     & (0x07 << SPI_CTRL_IRQ_RX_AVAIL));
 
-  NEORV32_SPI.CTRL = tmp;
+  NEORV32_SPI->CTRL = tmp;
 }
 
 
@@ -96,12 +94,12 @@ uint32_t neorv32_spi_get_clock_speed(void) {
 
   const uint32_t PRSC_LUT[8] = {2, 4, 8, 64, 128, 1024, 2048, 4096};
 
-  uint32_t ctrl = NEORV32_SPI.CTRL;
+  uint32_t ctrl = NEORV32_SPI->CTRL;
   uint32_t prsc_sel = (ctrl >> SPI_CTRL_PRSC0) & 0x7;
   uint32_t clock_div = (ctrl >> SPI_CTRL_CDIV0) & 0xf;
 
   uint32_t tmp = 2 * PRSC_LUT[prsc_sel] * clock_div;
-  return NEORV32_SYSINFO.CLK / tmp;
+  return NEORV32_SYSINFO->CLK / tmp;
 }
 
 
@@ -110,7 +108,7 @@ uint32_t neorv32_spi_get_clock_speed(void) {
  **************************************************************************/
 void neorv32_spi_disable(void) {
 
-  NEORV32_SPI.CTRL &= ~((uint32_t)(1 << SPI_CTRL_EN));
+  NEORV32_SPI->CTRL &= ~((uint32_t)(1 << SPI_CTRL_EN));
 }
 
 
@@ -119,7 +117,7 @@ void neorv32_spi_disable(void) {
  **************************************************************************/
 void neorv32_spi_enable(void) {
 
-  NEORV32_SPI.CTRL |= ((uint32_t)(1 << SPI_CTRL_EN));
+  NEORV32_SPI->CTRL |= ((uint32_t)(1 << SPI_CTRL_EN));
 }
 
 
@@ -130,7 +128,7 @@ void neorv32_spi_enable(void) {
  **************************************************************************/
 int neorv32_spi_get_fifo_depth(void) {
 
-  uint32_t tmp = (NEORV32_SPI.CTRL >> SPI_CTRL_FIFO_LSB) & 0x0f;
+  uint32_t tmp = (NEORV32_SPI->CTRL >> SPI_CTRL_FIFO_LSB) & 0x0f;
   return (int)(1 << tmp);
 }
 
@@ -144,10 +142,10 @@ int neorv32_spi_get_fifo_depth(void) {
  **************************************************************************/
 void neorv32_spi_cs_en(int cs) {
 
-  uint32_t tmp = NEORV32_SPI.CTRL;
+  uint32_t tmp = NEORV32_SPI->CTRL;
   tmp &= ~(0xf << SPI_CTRL_CS_SEL0); // clear old configuration
   tmp |= (1 << SPI_CTRL_CS_EN) | ((cs & 7) << SPI_CTRL_CS_SEL0); // set new configuration
-  NEORV32_SPI.CTRL = tmp;
+  NEORV32_SPI->CTRL = tmp;
 }
 
 
@@ -157,7 +155,8 @@ void neorv32_spi_cs_en(int cs) {
  * @note The SPI chip select output lines are HIGH when deactivated.
  **************************************************************************/
 void neorv32_spi_cs_dis(void) {
-  NEORV32_SPI.CTRL &= ~(1 << SPI_CTRL_CS_EN);
+
+  NEORV32_SPI->CTRL &= ~(1 << SPI_CTRL_CS_EN);
 }
 
 
@@ -166,37 +165,37 @@ void neorv32_spi_cs_dis(void) {
  *
  * @note This function is blocking.
  *
- * @param tx_data Transmit data (8/16/24/32-bit, LSB-aligned).
- * @return Receive data (8/16/24/32-bit, LSB-aligned).
+ * @param tx_data Transmit data (8-bit, LSB-aligned).
+ * @return Receive data (8-bit, LSB-aligned).
  **************************************************************************/
-uint32_t neorv32_spi_trans(uint32_t tx_data) {
+uint8_t neorv32_spi_trans(uint8_t tx_data) {
 
-  NEORV32_SPI.DATA = tx_data; // trigger transfer
-  while((NEORV32_SPI.CTRL & (1<<SPI_CTRL_BUSY)) != 0); // wait for current transfer to finish
+  NEORV32_SPI->DATA = (uint32_t)tx_data; // trigger transfer
+  while((NEORV32_SPI->CTRL & (1<<SPI_CTRL_BUSY)) != 0); // wait for current transfer to finish
 
-  return NEORV32_SPI.DATA;
+  return (uint8_t)NEORV32_SPI->DATA;
 }
 
 
 /**********************************************************************//**
  * Initiate SPI TX transfer (non-blocking).
  *
- * @param tx_data Transmit data (8/16/24/32-bit, LSB-aligned).
+ * @param tx_data Transmit data (8-bit, LSB-aligned).
  **************************************************************************/
-void neorv32_spi_put_nonblocking(uint32_t tx_data) {
+void neorv32_spi_put_nonblocking(uint8_t tx_data) {
 
-  NEORV32_SPI.DATA = tx_data; // trigger transfer
+  NEORV32_SPI->DATA = (uint32_t)tx_data; // trigger transfer
 }
 
 
 /**********************************************************************//**
  * Get SPI RX data (non-blocking).
  *
- * @return Receive data (8/16/24/32-bit, LSB-aligned).
+ * @return Receive data (8-bit, LSB-aligned).
  **************************************************************************/
-uint32_t neorv32_spi_get_nonblocking(void) {
+uint8_t neorv32_spi_get_nonblocking(void) {
 
-  return NEORV32_SPI.DATA;
+  return (uint8_t)NEORV32_SPI->DATA;
 }
 
 
@@ -207,7 +206,7 @@ uint32_t neorv32_spi_get_nonblocking(void) {
  **************************************************************************/
 int neorv32_spi_busy(void) {
 
-  if ((NEORV32_SPI.CTRL & (1<<SPI_CTRL_BUSY)) != 0) {
+  if ((NEORV32_SPI->CTRL & (1<<SPI_CTRL_BUSY)) != 0) {
     return 1;
   }
   else {

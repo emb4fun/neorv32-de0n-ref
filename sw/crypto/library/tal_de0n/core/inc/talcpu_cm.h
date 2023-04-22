@@ -68,12 +68,10 @@
 #define TAL_CPU_IRQ_EXIT()    OSIntExit(); /* Tell OS that we are leaving the ISR */ }
 #endif
 
-
 #if defined(RTOS_FREERTOS)
 #define TAL_CPU_IRQ_ENTER()   portDISABLE_INTERRUPTS()   
 #define TAL_CPU_IRQ_EXIT()    portENABLE_INTERRUPTS()
 #endif
-
 
 #endif /* defined(_lint) */
 

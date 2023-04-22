@@ -3,9 +3,9 @@
  <Bookmarks/>
  <Breakpoints groups="Breakpoints" active_group="Breakpoints"/>
  <ExecutionProfileWindow/>
- <FrameBufferWindow>
-  <FrameBufferWindow bufferHeight="-1" addressSpace="" addressText="" bufferWidth="-1"/>
- </FrameBufferWindow>
+ <FrameBuffer>
+  <FrameBufferWindow width="0" keepAspectRatio="0" zoomToFitWindow="0" addressSpace="" format="0" height="0" autoEvaluate="0" scaleFactor="1" refreshPeriod="0" name="crypto_SDRAM Release" addressText="" accessByDisplayWidth="0"/>
+ </FrameBuffer>
  <Memory1>
   <MemoryWindow addressSpace="" dataSize="1" autoEvaluate="0" viewMode="0" viewType="4" addressOrder="0" columnsText="" refreshPeriod="0" name="crypto_SDRAM Release" sizeText="" addressText=""/>
  </Memory1>
@@ -22,6 +22,9 @@
   <ProjectSessionItem path="crypto"/>
   <ProjectSessionItem path="crypto;crypto"/>
   <ProjectSessionItem path="crypto;crypto;Source Files"/>
+  <ProjectSessionItem path="crypto;crypto;Source Files;library"/>
+  <ProjectSessionItem path="crypto;crypto;Source Files;library;tal"/>
+  <ProjectSessionItem path="crypto;crypto;Source Files;library;tal;cpu"/>
   <ProjectSessionItem path="crypto;crypto;Source Files;src"/>
  </Project>
  <Register1>
@@ -55,7 +58,7 @@
   <Watches active="0" update="Never"/>
  </Watch4>
  <Files>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="294" useTextEdit="1" path="../src/main.c" left="0" selected="1" top="277" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="294" useTextEdit="1" path="../src/main.c" left="0" selected="1" top="275" codecName="Default"/>
  </Files>
  <EMStudioWindow activeProject="crypto" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="SDRAM Release" sessionSettings="" debugSearchFileMap="" fileDialogInitialDirectory="D:/Projekte/work/neorv32-de0n-ref_20230225/hw/src/neorv32/sw/lib/source" debugSearchPath="" autoConnectCapabilities="3199"/>
 </session>

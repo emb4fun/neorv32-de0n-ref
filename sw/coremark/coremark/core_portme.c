@@ -125,7 +125,7 @@ secs_ret
 time_in_secs(CORE_TICKS ticks)
 {
     /* NEORV32-specific */
-    secs_ret retval = (secs_ret)(((CORE_TICKS)ticks) / ((CORE_TICKS)NEORV32_SYSINFO.CLK));
+    secs_ret retval = (secs_ret)(((CORE_TICKS)ticks) / ((CORE_TICKS)NEORV32_SYSINFO->CLK));
     return retval;
 }
 
@@ -151,7 +151,7 @@ portable_init(core_portable *p, int *argc, char *argv[])
   /* NEORV32-specific */
   neorv32_cpu_csr_write(CSR_MIE, 0); // no interrupt, thanks
   neorv32_rte_setup(); // capture all exceptions and give debug information, no HW flow control
-  neorv32_uart0_setup(BAUD_RATE, PARITY_NONE, FLOW_CONTROL_NONE);
+  neorv32_uart0_setup(BAUD_RATE, 0);
 
 
 // Disable coremark compilation by default
@@ -183,7 +183,7 @@ portable_init(core_portable *p, int *argc, char *argv[])
 //  neorv32_cpu_csr_write(CSR_MHPMCOUNTER13, 0); neorv32_cpu_csr_write(CSR_MHPMEVENT13, 1 << HPMCNT_EVENT_TRAP);
 //  neorv32_cpu_csr_write(CSR_MHPMCOUNTER14, 0); neorv32_cpu_csr_write(CSR_MHPMEVENT14, 1 << HPMCNT_EVENT_ILLEGAL);
 
-  neorv32_uart0_printf("NEORV32: Processor running at %u Hz\n", (uint32_t)NEORV32_SYSINFO.CLK);
+  neorv32_uart0_printf("NEORV32: Processor running at %u Hz\n", (uint32_t)NEORV32_SYSINFO->CLK);
   neorv32_uart0_printf("NEORV32: Executing coremark (%u iterations). This may take some time...\n\n", (uint32_t)ITERATIONS);
 
   // clear cycle counter

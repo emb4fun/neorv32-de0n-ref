@@ -1,31 +1,31 @@
 -- ****************************************************************************
--- *  Copyright (c) 2021 by Michael Fischer (www.emb4fun.de) 
+-- *  Copyright (c) 2021 by Michael Fischer (www.emb4fun.de)
 -- *  All rights reserved.
 -- *
--- *  Redistribution and use in source and binary forms, with or without 
--- *  modification, are permitted provided that the following conditions 
+-- *  Redistribution and use in source and binary forms, with or without
+-- *  modification, are permitted provided that the following conditions
 -- *  are met:
--- *  
--- *  1. Redistributions of source code must retain the above copyright 
+-- *
+-- *  1. Redistributions of source code must retain the above copyright
 -- *     notice, this list of conditions and the following disclaimer.
 -- *  2. Redistributions in binary form must reproduce the above copyright
--- *     notice, this list of conditions and the following disclaimer in the 
+-- *     notice, this list of conditions and the following disclaimer in the
 -- *     documentation and/or other materials provided with the distribution.
--- *  3. Neither the name of the author nor the names of its contributors may 
--- *     be used to endorse or promote products derived from this software 
+-- *  3. Neither the name of the author nor the names of its contributors may
+-- *     be used to endorse or promote products derived from this software
 -- *     without specific prior written permission.
 -- *
--- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
--- *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
--- *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
--- *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL 
--- *  THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, 
--- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
--- *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS 
--- *  OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED 
--- *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
--- *  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF 
--- *  THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
+-- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+-- *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+-- *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+-- *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+-- *  THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+-- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+-- *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+-- *  OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+-- *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-- *  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+-- *  THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 -- *  SUCH DAMAGE.
 -- *
 -- ****************************************************************************
@@ -48,9 +48,9 @@ use neorv32.neorv32_package.all;
 -- ****************************************************************************
 
 entity top is
-   port ( 
+   port (
       --
-      -- Input clock 
+      -- Input clock
       --
       CLOCK_50    : in  std_logic;
 
@@ -59,7 +59,7 @@ entity top is
       --
       nTRST_i     : in  std_logic;
       TCK_i       : in  std_logic;
-      TDI_i       : in  std_logic; 
+      TDI_i       : in  std_logic;
       TDO_o       : out std_logic;
       TMS_i       : in  std_logic;
 
@@ -68,9 +68,9 @@ entity top is
       -- here a A3V64S40ETP-G6 (166MHz@CL-3) is used.
       -- Reference is made to Zentel datasheet:
       -- A3V64S40ETP, Revision 1.2, Mar., 2010
-      --        
+      --
       SDRAM_CLK   : out   std_logic;                        -- Master Clock
-      SDRAM_CKE   : out   std_logic;                        -- Clock Enable    
+      SDRAM_CKE   : out   std_logic;                        -- Clock Enable
       SDRAM_CS_N  : out   std_logic;                        -- Chip Select
       SDRAM_RAS_N : out   std_logic;                        -- Row Address Strobe
       SDRAM_CAS_N : out   std_logic;                        -- Column Address Strobe
@@ -81,19 +81,19 @@ entity top is
       SDRAM_ADDR  : out   std_logic_vector(12 downto 0);    -- Address Input (12 bits)
       SDRAM_BA_0  : out   std_logic;                        -- Bank Address 0
       SDRAM_BA_1  : out   std_logic;                        -- Bank Address 1
-      
+
       --
       -- User LEDs
       --
       LED         : out std_logic_vector(7 downto 0);
-      
+
       --
       -- Keys
       --
       KEY         : in  std_logic_vector(1 downto 0);
-      
+
       --
-      -- UART      
+      -- UART
       --
       UART0_TXD   : out std_logic;
       UART0_RXD   : in  std_logic
@@ -115,33 +115,33 @@ architecture syn of top is
    constant MEM_INT_IMEM_SIZE : natural := 32*1024;      -- size of processor-internal instruction memory in bytes
    constant MEM_INT_DMEM_SIZE : natural := 16*1024;      -- size of processor-internal data memory in bytes
 
-   
+
    --------------------------------------------------------
    -- Define all components which are included here
    --------------------------------------------------------
 
    --
    -- PLL
-   --   
+   --
    component pll_sys
-      port ( 
+      port (
          inclk0 : in  std_logic := '0';
          c0     : out std_logic;
          c1     : out std_logic;
-         locked : out std_logic 
+         locked : out std_logic
       );
    end component pll_sys;
 
-   
+
    --
    -- Wishbone Intercon
-   --   
+   --
    component wb_intercon is
-      port (  
+      port (
          -- Syscon
          clk_i      : in  std_logic := '0';
          rst_i      : in  std_logic := '0';
-      
+
          -- Wishbone Master
          wbm_stb_i  : in  std_logic := '0';
          wbm_cyc_i  : in  std_logic := '0';
@@ -151,18 +151,18 @@ architecture syn of top is
          wbm_dat_i  : in  std_logic_vector(31 downto 0) := (others => '0');
          wbm_dat_o  : out std_logic_vector(31 downto 0);
          wbm_sel_i  : in  std_logic_vector(03 downto 0) := (others => '0');
-      
+
          -- Wishbone Slave x
-         wbs_we_o   : out std_logic; 
-         wbs_dat_o  : out std_logic_vector(31 downto 0);  
-         wbs_sel_o  : out std_logic_vector(03 downto 0);  
-      
+         wbs_we_o   : out std_logic;
+         wbs_dat_o  : out std_logic_vector(31 downto 0);
+         wbs_sel_o  : out std_logic_vector(03 downto 0);
+
          -- Wishbone Slave 1
          wbs1_stb_o : out std_logic;
          wbs1_ack_i : in  std_logic := '0';
-         wbs1_adr_o : out std_logic_vector(27 downto 0);  
+         wbs1_adr_o : out std_logic_vector(27 downto 0);
          wbs1_dat_i : in  std_logic_vector(31 downto 0) := (others => '0')
-      
+
       );
    end component wb_intercon;
 
@@ -171,7 +171,7 @@ architecture syn of top is
    -- Wishbone SDRAM Controller
    --
    component wb_sdram is
-      port (  
+      port (
          -- System
          clk_i       : in  std_logic                      := '0';
          rst_i       : in  std_logic                      := '0';
@@ -182,9 +182,9 @@ architecture syn of top is
          wbs_sel_i   : in  std_logic_vector(03 downto 0)  := (others => '0');
          wbs_adr_i   : in  std_logic_vector(27 downto 0)  := (others => '0');
          wbs_dat_i   : in  std_logic_vector(31 downto 0)  := (others => '0');
-         wbs_dat_o   : out std_logic_vector(31 downto 0);  
+         wbs_dat_o   : out std_logic_vector(31 downto 0);
          wbs_ack_o   : out std_logic;
-      
+
          -- SDRAM
          sdram_addr  : out   std_logic_vector(12 downto 0);                    -- addr
          sdram_ba    : out   std_logic_vector(1 downto 0);                     -- ba
@@ -197,8 +197,8 @@ architecture syn of top is
          sdram_we_n  : out   std_logic                                         -- we_n
       );
    end component wb_sdram;
-   
-   
+
+
    --
    -- neorv32 top
    --
@@ -206,7 +206,8 @@ architecture syn of top is
      generic (
        -- General --
        CLOCK_FREQUENCY              : natural;           -- clock frequency of clk_i in Hz
-       HW_THREAD_ID                 : natural := 0;      -- hardware thread id (32-bit)
+       HART_ID                      : std_ulogic_vector(31 downto 0) := x"00000000"; -- hardware thread ID
+       VENDOR_ID                    : std_ulogic_vector(31 downto 0) := x"00000000"; -- vendor's JEDEC ID
        CUSTOM_ID                    : std_ulogic_vector(31 downto 0) := x"00000000"; -- custom user-defined ID
        INT_BOOTLOADER_EN            : boolean := false;  -- boot configuration: true = boot explicit bootloader; false = boot from int/ext (I)MEM
 
@@ -220,8 +221,8 @@ architecture syn of top is
        CPU_EXTENSION_RISCV_M        : boolean := false;  -- implement mul/div extension?
        CPU_EXTENSION_RISCV_U        : boolean := false;  -- implement user mode extension?
        CPU_EXTENSION_RISCV_Zfinx    : boolean := false;  -- implement 32-bit floating-point extension (using INT regs!)
-       CPU_EXTENSION_RISCV_Zicsr    : boolean := true;   -- implement CSR system?
        CPU_EXTENSION_RISCV_Zicntr   : boolean := true;   -- implement base counters?
+       CPU_EXTENSION_RISCV_Zicond   : boolean := false;  -- implement conditional operations extension?
        CPU_EXTENSION_RISCV_Zihpm    : boolean := false;  -- implement hardware performance monitors?
        CPU_EXTENSION_RISCV_Zifencei : boolean := false;  -- implement instruction stream sync.?
        CPU_EXTENSION_RISCV_Zmmul    : boolean := false;  -- implement multiply-only M sub-extension?
@@ -250,9 +251,14 @@ architecture syn of top is
 
        -- Internal Instruction Cache (iCACHE) --
        ICACHE_EN                    : boolean := false;  -- implement instruction cache
-       ICACHE_NUM_BLOCKS            : natural := 16;      -- i-cache: number of blocks (min 1), has to be a power of 2
+       ICACHE_NUM_BLOCKS            : natural := 4;      -- i-cache: number of blocks (min 1), has to be a power of 2
        ICACHE_BLOCK_SIZE            : natural := 64;     -- i-cache: block size in bytes (min 4), has to be a power of 2
-       ICACHE_ASSOCIATIVITY         : natural := 2;      -- i-cache: associativity / number of sets (1=direct_mapped), has to be a power of 2
+       ICACHE_ASSOCIATIVITY         : natural := 1;      -- i-cache: associativity / number of sets (1=direct_mapped), has to be a power of 2
+
+       -- Internal Data Cache (dCACHE) --
+       DCACHE_EN                    : boolean := false;  -- implement data cache
+       DCACHE_NUM_BLOCKS            : natural := 4;      -- d-cache: number of blocks (min 1), has to be a power of 2
+       DCACHE_BLOCK_SIZE            : natural := 64;     -- d-cache: block size in bytes (min 4), has to be a power of 2
 
        -- External memory interface (WISHBONE) --
        MEM_EXT_EN                   : boolean := false;  -- implement external memory bus interface?
@@ -277,7 +283,9 @@ architecture syn of top is
        IO_UART1_RX_FIFO             : natural := 1;      -- RX fifo depth, has to be a power of two, min 1
        IO_UART1_TX_FIFO             : natural := 1;      -- TX fifo depth, has to be a power of two, min 1
        IO_SPI_EN                    : boolean := false;  -- implement serial peripheral interface (SPI)?
-       IO_SPI_FIFO                  : natural := 0;      -- SPI RTX fifo depth, has to be zero or a power of two
+       IO_SPI_FIFO                  : natural := 1;      -- SPI RTX fifo depth, has to be a power of two, min 1
+       IO_SDI_EN                    : boolean := false;  -- implement serial data interface (SDI)?
+       IO_SDI_FIFO                  : natural := 0;      -- SDI RTX fifo depth, has to be zero or a power of two
        IO_TWI_EN                    : boolean := false;  -- implement two-wire interface (TWI)?
        IO_PWM_NUM_CH                : natural := 0;      -- number of PWM channels to implement (0..12); 0 = disabled
        IO_WDT_EN                    : boolean := false;  -- implement watch dog timer (WDT)?
@@ -285,10 +293,10 @@ architecture syn of top is
        IO_TRNG_FIFO                 : natural := 1;      -- TRNG fifo depth, has to be a power of two, min 1
        IO_CFS_EN                    : boolean := false;  -- implement custom functions subsystem (CFS)?
        IO_CFS_CONFIG                : std_ulogic_vector(31 downto 0) := x"00000000"; -- custom CFS configuration generic
-       IO_CFS_IN_SIZE               : positive := 32;    -- size of CFS input conduit in bits
-       IO_CFS_OUT_SIZE              : positive := 32;    -- size of CFS output conduit in bits
+       IO_CFS_IN_SIZE               : natural := 32;     -- size of CFS input conduit in bits
+       IO_CFS_OUT_SIZE              : natural := 32;     -- size of CFS output conduit in bits
        IO_NEOLED_EN                 : boolean := false;  -- implement NeoPixel-compatible smart LED interface (NEOLED)?
-       IO_NEOLED_TX_FIFO            : natural := 1;      -- NEOLED TX FIFO depth, 1..32k, has to be a power of two
+       IO_NEOLED_TX_FIFO            : natural := 1;      -- NEOLED FIFO depth, has to be a power of two, min 1
        IO_GPTMR_EN                  : boolean := false;  -- implement general purpose timer (GPTMR)?
        IO_XIP_EN                    : boolean := false;  -- implement execute in place module (XIP)?
        IO_ONEWIRE_EN                : boolean := false   -- implement 1-wire interface (ONEWIRE)?
@@ -324,8 +332,8 @@ architecture syn of top is
        -- XIP (execute in place via SPI) signals (available if IO_XIP_EN = true) --
        xip_csn_o      : out std_ulogic; -- chip-select, low-active
        xip_clk_o      : out std_ulogic; -- serial clock
-       xip_sdi_i      : in  std_ulogic := 'L'; -- device data input
-       xip_sdo_o      : out std_ulogic; -- controller data output
+       xip_dat_i      : in  std_ulogic := 'L'; -- device data input
+       xip_dat_o      : out std_ulogic; -- controller data output
 
        -- GPIO (available if IO_GPIO_NUM > 0) --
        gpio_o         : out std_ulogic_vector(63 downto 0); -- parallel output
@@ -334,27 +342,36 @@ architecture syn of top is
        -- primary UART0 (available if IO_UART0_EN = true) --
        uart0_txd_o    : out std_ulogic; -- UART0 send data
        uart0_rxd_i    : in  std_ulogic := 'U'; -- UART0 receive data
-       uart0_rts_o    : out std_ulogic; -- hw flow control: UART0.RX ready to receive ("RTR"), low-active, optional
-       uart0_cts_i    : in  std_ulogic := 'L'; -- hw flow control: UART0.TX allowed to transmit, low-active, optional
+       uart0_rts_o    : out std_ulogic; -- HW flow control: UART0.RX ready to receive ("RTR"), low-active, optional
+       uart0_cts_i    : in  std_ulogic := 'L'; -- HW flow control: UART0.TX allowed to transmit, low-active, optional
 
        -- secondary UART1 (available if IO_UART1_EN = true) --
        uart1_txd_o    : out std_ulogic; -- UART1 send data
        uart1_rxd_i    : in  std_ulogic := 'U'; -- UART1 receive data
-       uart1_rts_o    : out std_ulogic; -- hw flow control: UART1.RX ready to receive ("RTR"), low-active, optional
-       uart1_cts_i    : in  std_ulogic := 'L'; -- hw flow control: UART1.TX allowed to transmit, low-active, optional
+       uart1_rts_o    : out std_ulogic; -- HW flow control: UART1.RX ready to receive ("RTR"), low-active, optional
+       uart1_cts_i    : in  std_ulogic := 'L'; -- HW flow control: UART1.TX allowed to transmit, low-active, optional
 
        -- SPI (available if IO_SPI_EN = true) --
-       spi_sck_o      : out std_ulogic; -- SPI serial clock
-       spi_sdo_o      : out std_ulogic; -- controller data out, peripheral data in
-       spi_sdi_i      : in  std_ulogic := 'U'; -- controller data in, peripheral data out
+       spi_clk_o      : out std_ulogic; -- SPI serial clock
+       spi_dat_o      : out std_ulogic; -- controller data out, peripheral data in
+       spi_dat_i      : in  std_ulogic := 'U'; -- controller data in, peripheral data out
        spi_csn_o      : out std_ulogic_vector(07 downto 0); -- chip-select
 
+       -- SDI (available if IO_SDI_EN = true) --
+       sdi_clk_i      : in  std_ulogic := 'U'; -- SDI serial clock
+       sdi_dat_o      : out std_ulogic; -- controller data out, peripheral data in
+       sdi_dat_i      : in  std_ulogic := 'U'; -- controller data in, peripheral data out
+       sdi_csn_i      : in  std_ulogic := 'H'; -- chip-select
+
        -- TWI (available if IO_TWI_EN = true) --
-       twi_sda_io     : inout std_logic; -- twi serial data line
-       twi_scl_io     : inout std_logic; -- twi serial clock line
+       twi_sda_i      : in  std_ulogic := 'H'; -- serial data line sense input
+       twi_sda_o      : out std_ulogic; -- serial data line output (pull low only)
+       twi_scl_i      : in  std_ulogic := 'H'; -- serial clock line sense input
+       twi_scl_o      : out std_ulogic; -- serial clock line output (pull low only)
 
        -- 1-Wire Interface (available if IO_ONEWIRE_EN = true) --
-       onewire_io     : inout std_logic; -- 1-wire bus
+       onewire_i      : in  std_ulogic := 'H'; -- 1-wire bus sense input
+       onewire_o      : out std_ulogic; -- 1-wire bus output (pull low only)
 
        -- PWM (available if IO_PWM_NUM_CH > 0) --
        pwm_o          : out std_ulogic_vector(11 downto 0); -- pwm channels
@@ -376,7 +393,7 @@ architecture syn of top is
      );
    end component neorv32_top;
 
-   
+
    --------------------------------------------------------
    -- Define all local signals here
    --------------------------------------------------------
@@ -392,7 +409,7 @@ architecture syn of top is
 
    signal clk_i            : std_logic;
    signal rstn_i           : std_logic;
-   
+
    -- SDRAM
    signal sdram_ba         : std_logic_vector(1 downto 0);
    signal sdram_dqm        : std_logic_vector(1 downto 0);
@@ -406,7 +423,7 @@ architecture syn of top is
    signal wb_we            : std_ulogic;                      -- read/write
    signal wb_sel           : std_ulogic_vector(03 downto 0);  -- byte enable
    signal wb_stb           : std_ulogic;                      -- strobe
-   signal wb_cyc           : std_ulogic;                      
+   signal wb_cyc           : std_ulogic;
    signal wb_ack           : std_ulogic;                      -- transfer acknowledge
 
 	signal wb_sel_int       : std_logic_vector(03 downto 0);   -- byte enable
@@ -430,7 +447,7 @@ begin
    -- PLL
    --
    inst_pll_sys : pll_sys
-      port map ( 
+      port map (
          inclk0 => CLOCK_50,
          c0     => sys_clk,
          c1     => SDRAM_CLK,
@@ -439,11 +456,11 @@ begin
 
    --
    -- In general it is a bad idea to use an asynchhronous Reset signal.
-   -- But it is only a bad idea in case of asynchhronous deasserting. 
+   -- But it is only a bad idea in case of asynchhronous deasserting.
    -- Therefore the deasserting of the Reset signal must be synchronized.
-   --               
-                              
-   -- Asynchronous assert  
+   --
+
+   -- Asynchronous assert
    fpga_reset <= '1' when ((KEY(1) = '0') OR (KEY(0) = '0')) else '0';
    reset      <= '1' when ((fpga_reset = '1') OR (pll_locked = '0')) else '0';
 
@@ -457,11 +474,11 @@ begin
       elsif rising_edge(sys_clk) then
          reset_s1 <= '0';
          reset_s2 <= reset_s1;
-         reset_s3 <= reset_s2; 
+         reset_s3 <= reset_s2;
       end if;
-   end process;   
+   end process;
 
-   -- The deassert edge is now synchronized   
+   -- The deassert edge is now synchronized
    sys_rst <= reset_s3;
 
    clk_i  <= sys_clk;
@@ -475,21 +492,20 @@ begin
       generic map (
          -- General --
          CLOCK_FREQUENCY              => CLOCK_FREQUENCY,   -- clock frequency of clk_i in Hz
-         HW_THREAD_ID                 => 0,                 -- hardware thread id (32-bit)
          INT_BOOTLOADER_EN            => true,              -- boot configuration: true = boot explicit bootloader; false = boot from int/ext (I)MEM
 
          -- On-Chip Debugger (OCD) --
          ON_CHIP_DEBUGGER_EN          => true,              -- implement on-chip debugger
-         
+
          -- RISC-V CPU Extensions --
          CPU_EXTENSION_RISCV_B        => false,             -- implement bit-manipulation extension?
          CPU_EXTENSION_RISCV_C        => true,              -- implement compressed extension?
-         CPU_EXTENSION_RISCV_E        => false,             -- implement embedded RF extension?         
+         CPU_EXTENSION_RISCV_E        => false,             -- implement embedded RF extension?
          CPU_EXTENSION_RISCV_M        => true,              -- implement mul/div extension?
-         CPU_EXTENSION_RISCV_U        => false,             -- implement user mode extension?         
+         CPU_EXTENSION_RISCV_U        => false,             -- implement user mode extension?
          CPU_EXTENSION_RISCV_Zfinx    => false,             -- implement 32-bit floating-point extension (using INT regs!)
-         CPU_EXTENSION_RISCV_Zicsr    => true,              -- implement CSR system?
          CPU_EXTENSION_RISCV_Zicntr   => true,              -- implement base counters?
+         CPU_EXTENSION_RISCV_Zicond   => false,             -- implement conditional operations extension?
          CPU_EXTENSION_RISCV_Zihpm    => false,             -- implement hardware performance monitors?
          CPU_EXTENSION_RISCV_Zifencei => true,              -- implement instruction stream sync.?
          CPU_EXTENSION_RISCV_Zmmul    => false,             -- implement multiply-only M sub-extension?
@@ -502,7 +518,7 @@ begin
          -- Internal Instruction memory --
          MEM_INT_IMEM_EN              => true,              -- implement processor-internal instruction memory
          MEM_INT_IMEM_SIZE            => MEM_INT_IMEM_SIZE, -- size of processor-internal instruction memory in bytes
-         
+
          -- Internal Data memory --
          MEM_INT_DMEM_EN              => true,              -- implement processor-internal data memory
          MEM_INT_DMEM_SIZE            => MEM_INT_DMEM_SIZE, -- size of processor-internal data memory in bytes
@@ -519,7 +535,7 @@ begin
          MEM_EXT_PIPE_MODE            => false,             -- protocol: false=classic/standard wishbone mode, true=pipelined wishbone mode
          MEM_EXT_BIG_ENDIAN           => false,             -- byte order: true=big-endian, false=little-endian
          MEM_EXT_ASYNC_RX             => false,             -- use register buffer for RX data when false
-         
+
          -- Processor peripherals --
          IO_GPIO_NUM                  => 8,                 -- number of GPIO input/output pairs (0..64)
          IO_MTIME_EN                  => true,              -- implement machine system timer (MTIME)?
@@ -551,10 +567,10 @@ begin
          wb_cyc_o      => wb_cyc,                           -- valid cycle
          wb_ack_i      => wb_ack,                           -- transfer acknowledge
          wb_err_i      => '0',                              -- transfer error
-         
+
          -- GPIO (available if IO_GPIO_EN = true) --
          gpio_o        => gpio,                             -- parallel output
-         
+
          -- primary UART0 (available if IO_UART0_EN = true) --
          uart0_txd_o   => UART0_TXD,                        -- UART0 send data
          uart0_rxd_i   => UART0_RXD                         -- UART0 receive data
@@ -568,13 +584,13 @@ begin
 
    --
    -- Wishbone Intercon
-   --   
+   --
    inst_wb_intercon : wb_intercon
-      port map (  
+      port map (
          -- Syscon
          clk_i      => sys_clk,
          rst_i      => sys_rst,
-      
+
          -- Wishbone Master
          wbm_stb_i  => wb_stb,
          wbm_cyc_i  => wb_cyc,
@@ -584,17 +600,17 @@ begin
          wbm_dat_i  => wb_dat_write_int,
          wbm_dat_o  => wb_dat_read,
          wbm_sel_i  => wb_sel_int,
-      
+
          -- Wishbone Slave x
          wbs_we_o   => wbs_we_i,
          wbs_dat_o  => wbs_dat_i,
          wbs_sel_o  => wbs_sel_i,
-      
+
          -- Wishbone Slave 1
          wbs1_stb_o => wbs1_stb_i,
          wbs1_ack_i => wbs1_ack_o,
          wbs1_adr_o => wbs1_adr_i,
-         wbs1_dat_i => wbs1_dat_o 
+         wbs1_dat_i => wbs1_dat_o
       );
 
 
@@ -602,7 +618,7 @@ begin
    -- Wishbone SDRAM Controller
    --
    inst_wb_sdram: wb_sdram
-      port map (  
+      port map (
          -- System
          clk_i       => sys_clk,
          rst_i       => sys_rst,
@@ -630,17 +646,17 @@ begin
 
    SDRAM_BA_1 <= sdram_ba(1);
    SDRAM_BA_0 <= sdram_ba(0);
-   
-   SDRAM_DQMU <= sdram_dqm(1);
-   SDRAM_DQML <= sdram_dqm(0);  
 
-   
+   SDRAM_DQMU <= sdram_dqm(1);
+   SDRAM_DQML <= sdram_dqm(0);
+
+
    --------------------------------------------------------
    -- Output
    --------------------------------------------------------
 
    LED <= To_StdLogicVector( gpio(7 downto 0) );
-                
+
 end architecture syn;
 
 -- *** EOF ***
