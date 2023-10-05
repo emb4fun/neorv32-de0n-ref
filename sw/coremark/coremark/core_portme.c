@@ -151,8 +151,9 @@ portable_init(core_portable *p, int *argc, char *argv[])
   /* NEORV32-specific */
   neorv32_cpu_csr_write(CSR_MIE, 0); // no interrupt, thanks
   neorv32_rte_setup(); // capture all exceptions and give debug information, no HW flow control
-  neorv32_uart0_setup(BAUD_RATE, 0);
 
+  // setup UART at default baud rate, no interrupts
+  neorv32_uart0_setup(BAUD_RATE, 0);
 
 // Disable coremark compilation by default
 #ifndef RUN_COREMARK
@@ -169,26 +170,15 @@ portable_init(core_portable *p, int *argc, char *argv[])
 
   num_hpm_cnts_global = neorv32_cpu_hpm_get_num_counters();
 
-  // try to setup as many HPMs as possible
-//  neorv32_cpu_csr_write(CSR_MHPMCOUNTER3,  0); neorv32_cpu_csr_write(CSR_MHPMEVENT3,  1 << HPMCNT_EVENT_CIR);
-//  neorv32_cpu_csr_write(CSR_MHPMCOUNTER4,  0); neorv32_cpu_csr_write(CSR_MHPMEVENT4,  1 << HPMCNT_EVENT_WAIT_IF);
-//  neorv32_cpu_csr_write(CSR_MHPMCOUNTER5,  0); neorv32_cpu_csr_write(CSR_MHPMEVENT5,  1 << HPMCNT_EVENT_WAIT_II);
-//  neorv32_cpu_csr_write(CSR_MHPMCOUNTER6,  0); neorv32_cpu_csr_write(CSR_MHPMEVENT6,  1 << HPMCNT_EVENT_WAIT_MC);
-//  neorv32_cpu_csr_write(CSR_MHPMCOUNTER7,  0); neorv32_cpu_csr_write(CSR_MHPMEVENT7,  1 << HPMCNT_EVENT_LOAD);
-//  neorv32_cpu_csr_write(CSR_MHPMCOUNTER8,  0); neorv32_cpu_csr_write(CSR_MHPMEVENT8,  1 << HPMCNT_EVENT_STORE);
-//  neorv32_cpu_csr_write(CSR_MHPMCOUNTER9,  0); neorv32_cpu_csr_write(CSR_MHPMEVENT9,  1 << HPMCNT_EVENT_WAIT_LS);
-//  neorv32_cpu_csr_write(CSR_MHPMCOUNTER10, 0); neorv32_cpu_csr_write(CSR_MHPMEVENT10, 1 << HPMCNT_EVENT_JUMP);
-//  neorv32_cpu_csr_write(CSR_MHPMCOUNTER11, 0); neorv32_cpu_csr_write(CSR_MHPMEVENT11, 1 << HPMCNT_EVENT_BRANCH);
-//  neorv32_cpu_csr_write(CSR_MHPMCOUNTER12, 0); neorv32_cpu_csr_write(CSR_MHPMEVENT12, 1 << HPMCNT_EVENT_TBRANCH);
-//  neorv32_cpu_csr_write(CSR_MHPMCOUNTER13, 0); neorv32_cpu_csr_write(CSR_MHPMEVENT13, 1 << HPMCNT_EVENT_TRAP);
-//  neorv32_cpu_csr_write(CSR_MHPMCOUNTER14, 0); neorv32_cpu_csr_write(CSR_MHPMEVENT14, 1 << HPMCNT_EVENT_ILLEGAL);
+  // stop all counters for now
+  neorv32_cpu_csr_write(CSR_MCOUNTINHIBIT, -1);
+//  neorv32_cpu_csr_write(CSR_MCOUNTEREN, -1); // enable access to all counters
+
+  // clear cycle counter
+  neorv32_cpu_set_mcycle(0);
 
   neorv32_uart0_printf("NEORV32: Processor running at %u Hz\n", (uint32_t)NEORV32_SYSINFO->CLK);
   neorv32_uart0_printf("NEORV32: Executing coremark (%u iterations). This may take some time...\n\n", (uint32_t)ITERATIONS);
-
-  // clear cycle counter
-  neorv32_cpu_csr_write(CSR_MCOUNTEREN, -1); // enable access to all counters
-  neorv32_cpu_set_mcycle(0);
 
 /*
 #error \
