@@ -37,8 +37,6 @@
   <ProjectSessionItem path="coremark;coremark"/>
   <ProjectSessionItem path="coremark;coremark;Source Files"/>
   <ProjectSessionItem path="coremark;coremark;Source Files;coremark"/>
-  <ProjectSessionItem path="coremark;coremark;Source Files;library"/>
-  <ProjectSessionItem path="coremark;coremark;Source Files;library;neorv32"/>
   <ProjectSessionItem path="coremark;coremark;System Files"/>
  </Project>
  <Register1>
@@ -85,12 +83,6 @@
  </Watch4>
  <Files>
   <SessionOpenFile windowGroup="DockEditLeft" x="0" y="126" useTextEdit="1" path="../coremark/core_main.c" left="0" selected="1" top="106" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="2" y="174" useTextEdit="1" path="../coremark/core_portme.c" left="0" top="161" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="310" useTextEdit="1" path="../../../hw/src/neorv32/sw/lib/include/neorv32_cpu.h" left="0" top="289" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="89" useTextEdit="1" path="../../../hw/src/neorv32/sw/lib/source/neorv32_rte.c" left="0" top="67" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="445" useTextEdit="1" path="../../../hw/src/neorv32/sw/lib/source/neorv32_cpu.c" left="0" top="417" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="16" y="58" useTextEdit="1" openedFrom="D:/Projekte/GitHub/neorv32-de0n-ref/sw/coremark/coremark/core_portme.c" path="../../../hw/src/neorv32/sw/lib/include/neorv32_cpu_csr.h" left="0" top="40" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="238" useTextEdit="1" path="riscv_crt0.s" left="0" top="220" codecName="Default"/>
  </Files>
- <EMStudioWindow activeProject="coremark" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="SDRAM Release" sessionSettings="" debugSearchFileMap="" fileDialogInitialDirectory="D:/Projekte/work/neorv32-de0n/hw/src/neorv32/sw/lib/source" debugSearchPath="" autoConnectCapabilities="3199"/>
+ <EMStudioWindow activeProject="coremark" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="TCM Release" sessionSettings="" debugSearchFileMap="" fileDialogInitialDirectory="D:/Projekte/work/neorv32-de0n/hw/src/neorv32/sw/lib/source" debugSearchPath="" autoConnectCapabilities="3199"/>
 </session>

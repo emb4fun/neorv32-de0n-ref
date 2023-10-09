@@ -253,7 +253,7 @@ void tal_CPURngInit (void)
          }
 
          /* enable TRNG */
-         neorv32_trng_enable();
+         neorv32_trng_enable(0);
 
          bInitDone = 1;
       }
@@ -327,7 +327,7 @@ void tal_CPUInitHWDog (void)
       bInitDone = 1;
 
       dTimeoutSec = 1 * (NEORV32_SYSINFO->CLK / 4096);
-      neorv32_wdt_setup(dTimeoutSec, 0, 0, 1);
+      neorv32_wdt_setup(dTimeoutSec, 0, 0, 1, 1);
    }
 
 } /* tal_CPUInitHWDog */
