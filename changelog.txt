@@ -2,13 +2,17 @@
 * Project: neorv32-de0n-ref
 * Name   : "My reference design for a DE0-Nano board with a NEORV32"
 * Target : Terasic DE0-Nano Development and Education Board 
-* Version: 20231005
+* Version: 20251010
 ***************************************************************************
-* Tools  : Quartus II 15.0.2
-*          SEGGER Embedded Studio for RISC-V v7.32
+* Tools  : Quartus Prime Lite 20.1.1
+*          SEGGER Embedded Studio v8.24
 ***************************************************************************
 * URL    : https://www.emb4fun.de/riscv/de0nref/index.html
 ***************************************************************************
+
+= 10.10.2025
+   * Updated NEORV32 to v1.12.3.3 
+   * Used Quartus Prime Lite v20.1.1 and SEGGER Embedded Studio v8.24
 
 = 05.10.2023
    * Updated NEORV32 to v1.8.9.6	

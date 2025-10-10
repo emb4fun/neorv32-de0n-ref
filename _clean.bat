@@ -1,18 +1,32 @@
 @echo off
 
 del *.bak /S
-cd hw
+
+cd fpga
 call _clean.bat
 cd ..
 
-cd sw\coremark
+cd blinky
 call _clean.bat
-cd ..\..
+cd ..
 
-cd sw\dhrystone
+cd blinky-tcts
 call _clean.bat
-cd ..\..
+cd ..
 
-cd sw\crypto
+cd coremark
 call _clean.bat
-cd ..\..
+cd ..
+
+cd crypto
+call _clean.bat
+cd ..
+
+
+cd dhrystone
+call _clean.bat
+cd ..
+
+cd memtest
+call _clean.bat
+cd ..
