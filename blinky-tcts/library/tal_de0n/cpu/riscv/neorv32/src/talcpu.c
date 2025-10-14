@@ -357,7 +357,6 @@ void tal_CPUTriggerHWDog (void)
    // TODO...
 } /* tal_CPUTriggerHWDog */
 
-
 /*************************************************************************/
 /*  tal_CPUReboot                                                        */
 /*                                                                       */

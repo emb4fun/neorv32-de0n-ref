@@ -572,6 +572,7 @@ begin
          IO_GPIO_NUM                => 8,                   -- number of GPIO input/output pairs (0..32)
          IO_CLINT_EN                => true,                -- implement core local interruptor (CLINT)
          IO_UART0_EN                => true,                -- implement primary universal asynchronous receiver/transmitter (UART0)
+         IO_WDT_EN                  => true,                -- implement watch dog timer (WDT)
          IO_TRNG_EN                 => true,                -- implement true random number generator (TRNG)
          IO_TRNG_FIFO               => 1,                   -- data FIFO depth, has to be a power of two, min 1
          IO_GPTMR_EN                => true                 -- implement general purpose timer (GPTMR)
