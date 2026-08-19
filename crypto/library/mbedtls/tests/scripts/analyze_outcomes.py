@@ -33,7 +33,7 @@ class CoverageTask(outcome_analysis.CoverageTask):
                           r'.*\b(?:' + r'|'.join(words) + r')\b.*',
                           re.DOTALL)
 
-    IGNORED_TESTS = {
+    UNCOVERED_TESTS = {
         'ssl-opt': [
             # We don't run ssl-opt.sh with Valgrind on the CI because
             # it's extremely slow. We don't intend to change this.
@@ -43,7 +43,7 @@ class CoverageTask(outcome_analysis.CoverageTask):
             'DTLS cookie: enabled, IPv6',
             # Disabled due to OpenSSL bug.
             # https://github.com/openssl/openssl/issues/18887
-            'DTLS fragmenting: 3d, openssl client, DTLS 1.2',
+            'DTLS fragmenting: 3d, MTU=512, openssl client, DTLS 1.2',
             # We don't run ssl-opt.sh with Valgrind on the CI because
             # it's extremely slow. We don't intend to change this.
             'DTLS fragmenting: proxy MTU: auto-reduction (with valgrind)',
@@ -53,6 +53,15 @@ class CoverageTask(outcome_analysis.CoverageTask):
             # https://github.com/Mbed-TLS/mbedtls/issues/9581
             'Opaque key for server authentication: invalid key: decrypt with ECC key, no async',
             'Opaque key for server authentication: invalid key: ecdh with RSA key, no async',
+            # The following test fails intermittently on the CI with a frequency
+            # that significantly impacts CI throughput. They are thus disabled
+            # for the time being. See
+            # https://github.com/Mbed-TLS/mbedtls/issues/10652 for more
+            # information.
+            'DTLS proxy: 3d, openssl client, fragmentation',
+            'DTLS proxy: 3d, openssl client, fragmentation, nbio',
+            'DTLS proxy: 3d, gnutls client, fragmentation',
+            'DTLS proxy: 3d, gnutls client, fragmentation, nbio=2',
         ],
         'test_suite_config.mbedtls_boolean': [
             # We never test with CBC/PKCS5/PKCS12 enabled but
@@ -86,10 +95,6 @@ class CoverageTask(outcome_analysis.CoverageTask):
             # Untested platform-specific optimizations.
             # https://github.com/Mbed-TLS/mbedtls/issues/9588
             'Config: MBEDTLS_HAVE_SSE2',
-            # Obsolete configuration option, to be replaced by
-            # PSA entropy drivers.
-            # https://github.com/Mbed-TLS/mbedtls/issues/8150
-            'Config: MBEDTLS_NO_PLATFORM_ENTROPY',
             # Untested aspect of the platform interface.
             # https://github.com/Mbed-TLS/mbedtls/issues/9589
             'Config: MBEDTLS_PLATFORM_NO_STD_FUNCTIONS',
@@ -102,9 +107,6 @@ class CoverageTask(outcome_analysis.CoverageTask):
             'Config: MBEDTLS_SHA256_USE_A64_CRYPTO_ONLY',
             'Config: MBEDTLS_SHA256_USE_ARMV8_A_CRYPTO_ONLY',
             'Config: MBEDTLS_SHA512_USE_A64_CRYPTO_ONLY',
-            # We don't run test_suite_config when we test this.
-            # https://github.com/Mbed-TLS/mbedtls/issues/9586
-            'Config: MBEDTLS_TEST_CONSTANT_FLOW_VALGRIND',
         ],
         'test_suite_config.psa_boolean': [
             # We don't test with HMAC disabled.
@@ -447,8 +449,8 @@ class DriverVSReference_no_ecp_at_all(outcome_analysis.DriverVSReference):
             # consequence compressed points are supported in the reference
             # component but not in the accelerated one, so they should be skipped
             # while checking driver's coverage.
-            re.compile(r'Parse EC Key .*compressed\)'),
-            re.compile(r'Parse Public EC Key .*compressed\)'),
+            re.compile(r'Parse EC Key .*(?<!un)compressed\)'),
+            re.compile(r'Parse Public EC Key.*(?<!un)compressed.*'),
         ],
         # See ecp_light_only
         'test_suite_ssl': [
@@ -485,8 +487,8 @@ class DriverVSReference_ecc_no_bignum(outcome_analysis.DriverVSReference):
         ],
         # See no_ecp_at_all
         'test_suite_pkparse': [
-            re.compile(r'Parse EC Key .*compressed\)'),
-            re.compile(r'Parse Public EC Key .*compressed\)'),
+            re.compile(r'Parse EC Key .*(?<!un)compressed\)'),
+            re.compile(r'Parse Public EC Key.*(?<!un)compressed.*'),
         ],
         'test_suite_asn1parse': [
             'INTEGER too large for mpi',
@@ -540,8 +542,8 @@ class DriverVSReference_ecc_ffdh_no_bignum(outcome_analysis.DriverVSReference):
         ],
         # See no_ecp_at_all
         'test_suite_pkparse': [
-            re.compile(r'Parse EC Key .*compressed\)'),
-            re.compile(r'Parse Public EC Key .*compressed\)'),
+            re.compile(r'Parse EC Key .*(?<!un)compressed\)'),
+            re.compile(r'Parse Public EC Key.*(?<!un)compressed.*'),
         ],
         'test_suite_asn1parse': [
             'INTEGER too large for mpi',
@@ -670,6 +672,12 @@ class DriverVSReference_block_cipher_dispatch(outcome_analysis.DriverVSReference
             # but these are not available in the accelerated component.
             'CMAC null arguments',
             re.compile('CMAC.* (AES|ARIA|Camellia).*'),
+        ],
+        'test_suite_cipher.constant_time': [
+            # Like with test_suite_cipher.aes and such, these tests call
+            # cipher_wrapper in a way that requires the block cipher to
+            # be built in.
+            re.compile('.*(AES|ARIA|CAMELLIA).*(encrypt|decrypt).*', re.I),
         ],
         'test_suite_cipher.padding': [
             # Following tests require AES_C/CAMELLIA_C to be enabled,

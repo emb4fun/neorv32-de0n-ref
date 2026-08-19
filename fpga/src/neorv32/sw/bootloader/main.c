@@ -3,12 +3,11 @@
 /* -------------------------------------------------------------------------------- */
 /* The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              */
 /* Copyright (c) NEORV32 contributors.                                              */
-/* Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  */
+/* Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  */
 /* Licensed under the BSD-3-Clause license, see LICENSE for details.                */
 /* SPDX-License-Identifier: BSD-3-Clause                                            */
 /* ================================================================================ */
 
-// libraries
 #include <stdint.h>
 #include <neorv32.h>
 #include <config.h>
@@ -19,9 +18,9 @@
 #include <twi_flash.h>
 
 /**********************************************************************//**
- * Bootloader main. "naked" because this is free-standing.
+ * Bootloader main. Should never return.
  **************************************************************************/
-int __attribute__((naked)) main(void) {
+int main(void) {
 
   // ------------------------------------------------
   // System setup
@@ -31,7 +30,7 @@ int __attribute__((naked)) main(void) {
   system_setup();
 
   // intro screen
-  uart_puts("\n\n\n"THEME_INTRO"\n"
+  uart_puts("\n\n" THEME_INTRO "\n"
             "build: " __DATE__ "\n\n");
 
   // ------------------------------------------------
@@ -44,7 +43,7 @@ int __attribute__((naked)) main(void) {
   // wait for timeout or user abort
   if (neorv32_clint_available()) {
     uart_puts(" in "xstr(AUTO_BOOT_TIMEOUT)"s. Press any key to abort.\n");
-    uint64_t timeout_time = neorv32_clint_time_get() + (uint64_t)(AUTO_BOOT_TIMEOUT * NEORV32_SYSINFO->CLK);
+    uint64_t timeout_time = neorv32_clint_time_get() + (AUTO_BOOT_TIMEOUT * (uint64_t)(NEORV32_SYSINFO->CLK));
     while (1) {
 
       // wait for user input via UART0
@@ -67,21 +66,34 @@ int __attribute__((naked)) main(void) {
 #if (TWI_FLASH_EN == 1)
   uart_putc('\n');
   uart_puts("Loading from TWI flash "xstr(TWI_FLASH_ID)" @"xstr(TWI_FLASH_BASE_ADDR)"... ");
-  if (system_exe_load(twi_flash_setup, twi_flash_stream_get) == 0) { system_boot_app(); }
+  if (system_app_load(twi_flash_setup, twi_flash_stream_get) == 0) {
+    system_app_boot();
+  }
 #endif
 
   // try booting from SPI flash
 #if (SPI_FLASH_EN == 1)
   uart_putc('\n');
   uart_puts("Loading from SPI flash @"xstr(SPI_FLASH_BASE_ADDR)"... ");
-  if (system_exe_load(spi_flash_setup, spi_flash_stream_get) == 0) { system_boot_app(); }
+  if (system_app_load(spi_flash_setup, spi_flash_stream_get) == 0) {
+    system_app_boot();
+  }
 #endif
 
   // try booting from SD card
 #if (SPI_SDCARD_EN == 1)
   uart_putc('\n');
   uart_puts("Loading SD card file "SPI_SDCARD_FILE"... ");
-  if (system_exe_load(sdcard_setup, sdcard_stream_get) == 0) { system_boot_app(); }
+  if (system_app_load(sdcard_setup, sdcard_stream_get) == 0) {
+    system_app_boot();
+  }
+#endif
+
+  // directly execute from memory address
+#if (DIRECT_BOOT_EN == 1)
+  uart_putc('\n');
+  uart_puts("Direct boot...\n");
+  system_direct_boot((uint32_t)DIRECT_BOOT_ADDR);
 #endif
 
 skip_auto_boot:
@@ -110,14 +122,14 @@ skip_auto_boot:
     /**** get executable via UART ****/
     if (cmd == 'u') {
       uart_puts("Awaiting "THEME_EXE"... ");
-      if (system_exe_load(uart_setup, uart_stream_get)) {
+      if (system_app_load(uart_setup, uart_stream_get)) {
         break; // halt (to prevent garbage stream to trigger stuff)
       }
     }
 
     /**** start application program from main memory ****/
     if (cmd == 'e') {
-      system_boot_app();
+      system_app_boot();
     }
 
     /**** exit while loop: shutdown ****/
@@ -132,6 +144,9 @@ skip_auto_boot:
         "h: Help\n"
         "i: System info\n"
         "r: Restart\n"
+#if (DIRECT_BOOT_EN == 1)
+        "d: Direct boot\n"
+#endif
         "u: Upload via UART\n"
 #if (TWI_FLASH_EN == 1)
         "t: TWI flash - load\n"
@@ -162,6 +177,8 @@ skip_auto_boot:
       uart_puts("\nMISA: ");
       uart_puth(neorv32_cpu_csr_read(CSR_MISA));
       uart_puts("\nXISA: ");
+      uart_puth(neorv32_cpu_csr_read(CSR_MXISAH));
+      uart_putc('_');
       uart_puth(neorv32_cpu_csr_read(CSR_MXISA));
       uart_puts("\nSOC:  ");
       uart_puth(NEORV32_SYSINFO->SOC);
@@ -174,12 +191,12 @@ skip_auto_boot:
 #if (TWI_FLASH_EN == 1)
 #if (TWI_FLASH_PROG_EN == 1)
     if (cmd == 'w') { // program TWI flash
-      system_exe_store(twi_flash_setup, twi_flash_erase, twi_flash_stream_put);
+      system_app_store(twi_flash_setup, twi_flash_erase, twi_flash_stream_put);
     }
 #endif
     if (cmd == 't') { // get executable from TWI flash
       uart_puts("Loading from TWI flash "xstr(TWI_FLASH_ID)" @"xstr(TWI_FLASH_BASE_ADDR)"... ");
-      system_exe_load(twi_flash_setup, twi_flash_stream_get);
+      system_app_load(twi_flash_setup, twi_flash_stream_get);
     }
 #endif
 
@@ -187,12 +204,12 @@ skip_auto_boot:
 #if (SPI_FLASH_EN == 1)
 #if (SPI_FLASH_PROG_EN == 1)
     if (cmd == 's') { // program SPI flash
-      system_exe_store(spi_flash_setup, spi_flash_erase, spi_flash_stream_put);
+      system_app_store(spi_flash_setup, spi_flash_erase, spi_flash_stream_put);
     }
 #endif
     if (cmd == 'l') { // get executable from SPI flash
       uart_puts("Loading from SPI flash @"xstr(SPI_FLASH_BASE_ADDR)"... ");
-      system_exe_load(spi_flash_setup, spi_flash_stream_get);
+      system_app_load(spi_flash_setup, spi_flash_stream_get);
     }
 #endif
 
@@ -200,18 +217,23 @@ skip_auto_boot:
 #if (SPI_SDCARD_EN == 1)
     if (cmd == 'c') {
       uart_puts("Loading SD card file "SPI_SDCARD_FILE"... ");
-      system_exe_load(sdcard_setup, sdcard_stream_get);
+      system_app_load(sdcard_setup, sdcard_stream_get);
+    }
+#endif
+
+    /**** direct boot / execute in-place ****/
+#if (DIRECT_BOOT_EN == 1)
+    if (cmd == 'd') {
+      uart_puts("Direct execute in-place...\n");
+      system_direct_boot((uint32_t)DIRECT_BOOT_ADDR);
     }
 #endif
 
   }
 #endif
 
-  // raise exception and halt
+  // bootloader should never return: raise exception and halt
   asm volatile ("ebreak");
   __builtin_unreachable();
-
-  // bootloader cannot return as main is "naked"
-  while(1);
-  return 0;
+  return -1;
 }

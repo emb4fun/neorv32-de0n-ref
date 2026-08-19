@@ -6,8 +6,8 @@ Packaging the entire processor as IP module allows easy integration of the core 
 into a block-design-based Vivado project. The NEORV32 repository provides a full-scale TCL script that
 automatically packages the processor as Vivado IP block including an interactive configuration GUI.
 For this, a specialized wrapper for the processor's top entity is provided
-(`rtl/system_integration/neorv32_vivado_ip.vhd`) that features AXI4 (via XBUS)
-and AXI4-Stream (via SLINK) compatible interfaces.
+(`rtl/system_integration/neorv32_vivado_ip.vhd`) that features AXI4-compatible (via XBUS)
+and AXI4-Stream-compatible (via SLINK) interfaces.
 
 .General AXI Wrapper
 [NOTE]
@@ -74,7 +74,7 @@ For every change that is made to the hardware RTL code (excluding configuration 
 the NEORV32 IP module needs to be re-packaged by re-executing the packing script (`neorv32_vivado_ip.tcl`). +
  +
 This also applies if an executable installed right into the IMEM shall be updated. It is **not** possible to replace the IMEM image
-(`neorv32_application_image.vhd`) file in the packaged_ip folder. For the Vivado design suite, the new program to be executed must
+(`neorv32_imem_image.vhd`) file in the packaged_ip folder. For the Vivado design suite, the new program to be executed must
 be compiled and installed using the `install` makefile target. Next, the `neorv32_vivado_ip.tcl` script has to be executed again.
 Finally, Vivado will prompt to upgrade the NEORV32 IP.
 
@@ -82,8 +82,8 @@ Finally, Vivado will prompt to upgrade the NEORV32 IP.
 [IMPORTANT]
 If NEORV32 configurations do not take effect, try using the out-of-context synthesis option.
 
-. Incremental Compilation of Simulation Sources (ISIM)
+.Incremental Compilation of Simulation Sources (ISIM)
 [IMPORTANT]
-When using AMD Vivado (ISIM for simulation) make sure to **TURN OFF** "incremental compilation" (_Project Setting_
+When using AMD Vivado (XSIM for simulation) make sure to **TURN OFF** "incremental compilation" (_Project Setting_
 -> _Simulation_ -> _Advanced_ -> _Enable incremental compilation). This will slow down simulation relaunch but will
 ensure that all application images (`*_image.vhd`) are reanalyzed when recompiling the NEORV32 application or bootloader.

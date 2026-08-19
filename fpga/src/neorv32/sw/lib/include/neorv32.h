@@ -1,7 +1,7 @@
 // ================================================================================ //
 // The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              //
 // Copyright (c) NEORV32 contributors.                                              //
-// Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  //
+// Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  //
 // Licensed under the BSD-3-Clause license, see LICENSE for details.                //
 // SPDX-License-Identifier: BSD-3-Clause                                            //
 // ================================================================================ //
@@ -27,8 +27,8 @@ extern "C" {
 #if defined(STDIO_SEMIHOSTING)
 #include <stdio.h>
 #include <string.h>
-#include <fcntl.h> // for open
-#include <unistd.h> // for close
+#include <fcntl.h>  // for open()
+#include <unistd.h> // for close()
 #endif
 
 /**********************************************************************//**
@@ -51,7 +51,7 @@ extern "C" {
 #define NEORV32_SLINK_BASE   (0xFFEC0000U) /**< Stream Link Interface (SLINK) */
 #define NEORV32_DMA_BASE     (0xFFED0000U) /**< Direct Memory Access Controller (DMA) */
 //#define NEORV32_???_BASE   (0xFFEE0000U) /**< reserved */
-//#define NEORV32_???_BASE   (0xFFEF0000U) /**< reserved */
+#define NEORV32_SMC_BASE     (0xFFEF0000U) /**< Serial Memory Controller (SMC) */
 #define NEORV32_PWM_BASE     (0xFFF00000U) /**< Pulse Width Modulation Controller (PWM) */
 #define NEORV32_GPTMR_BASE   (0xFFF10000U) /**< General Purpose Timer (GPTMR) */
 #define NEORV32_ONEWIRE_BASE (0xFFF20000U) /**< 1-Wire Interface Controller (ONEWIRE) */
@@ -75,12 +75,6 @@ extern "C" {
  * @name Fast Interrupt Requests (FIRQ) Aliases
  **************************************************************************/
 /**@{*/
-/** @name Two-Wire Device (TWD) */
-/**@{*/
-#define TWD_FIRQ_ENABLE        CSR_MIE_FIRQ0E    /**< MIE CSR bit (#NEORV32_CSR_MIE_enum) */
-#define TWD_FIRQ_PENDING       CSR_MIP_FIRQ0P    /**< MIP CSR bit (#NEORV32_CSR_MIP_enum) */
-#define TWD_TRAP_CODE          TRAP_CODE_FIRQ_0  /**< MCAUSE CSR trap code (#NEORV32_EXCEPTION_CODES_enum) */
-/**@}*/
 /** @name Custom Functions Subsystem (CFS) */
 /**@{*/
 #define CFS_FIRQ_ENABLE        CSR_MIE_FIRQ1E    /**< MIE CSR bit (#NEORV32_CSR_MIE_enum) */
@@ -98,6 +92,12 @@ extern "C" {
 #define UART1_FIRQ_ENABLE      CSR_MIE_FIRQ3E    /**< MIE CSR bit (#NEORV32_CSR_MIE_enum) */
 #define UART1_FIRQ_PENDING     CSR_MIP_FIRQ3P    /**< MIP CSR bit (#NEORV32_CSR_MIP_enum) */
 #define UART1_TRAP_CODE        TRAP_CODE_FIRQ_3  /**< MCAUSE CSR trap code (#NEORV32_EXCEPTION_CODES_enum) */
+/**@}*/
+/** @name Two-Wire Device (TWD) */
+/**@{*/
+#define TWD_FIRQ_ENABLE        CSR_MIE_FIRQ4E    /**< MIE CSR bit (#NEORV32_CSR_MIE_enum) */
+#define TWD_FIRQ_PENDING       CSR_MIP_FIRQ4P    /**< MIP CSR bit (#NEORV32_CSR_MIP_enum) */
+#define TWD_TRAP_CODE          TRAP_CODE_FIRQ_4  /**< MCAUSE CSR trap code (#NEORV32_EXCEPTION_CODES_enum) */
 /**@}*/
 /** @name Execution Trace Buffer (TRACER) */
 /**@{*/
@@ -193,7 +193,7 @@ extern char __crt0_ram_size[]; /**< ROM size in bytes */
 
 
 /**********************************************************************//**
- * Processor clock prescaler select (relative to processor's main clock)
+ * @name Processor clock prescaler select (relative to processor's main clock)
  **************************************************************************/
 /**@{*/
 enum NEORV32_CLOCK_PRSC_enum {
@@ -210,36 +210,76 @@ enum NEORV32_CLOCK_PRSC_enum {
 
 
 /**********************************************************************//**
- * @name Subword-access helper types
+ * @name Subword access helper types
  **************************************************************************/
 /**@{*/
-/** @name 64-bit */
+/** 64-bit */
 typedef union {
   uint64_t uint64;
-  uint32_t uint32[sizeof(uint64_t)/sizeof(uint32_t)];
-  uint16_t uint16[sizeof(uint64_t)/sizeof(uint16_t)];
-  uint8_t  uint8[sizeof(uint64_t)/sizeof(uint8_t)];
+  uint32_t uint32[2];
+  uint16_t uint16[4];
+  uint8_t  uint8[8];
 } subwords64_t;
-/** @name 32-bit */
+
+/** 32-bit */
 typedef union {
   uint32_t uint32;
-  uint16_t uint16[sizeof(uint32_t)/sizeof(uint16_t)];
-  uint8_t  uint8[sizeof(uint32_t)/sizeof(uint8_t)];
+  uint16_t uint16[2];
+  uint8_t  uint8[4];
 } subwords32_t;
-/** @name 16-bit */
+
+/** 16-bit */
 typedef union {
   uint16_t uint16;
-  uint8_t  uint8[sizeof(uint16_t)/sizeof(uint8_t)];
+  uint8_t  uint8[2];
 } subwords16_t;
 /**@}*/
 
 
-// ----------------------------------------------------------------------------
-// Include all processor header files
-// ----------------------------------------------------------------------------
+/**********************************************************************//**
+ * @name Generic helper macros
+ **************************************************************************/
+/**@{*/
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+/**@}*/
+
+
+/**********************************************************************//**
+ * @name Memory-mapped register bit-mask operations
+ **************************************************************************/
+/**@{*/
+// generic
+#define __MMREG_BSET(r, m) ((r) |=  (m))
+#define __MMREG_BCLR(r, m) ((r) &= ~(m))
+#define __MMREG_BINV(r, m) ((r) ^=  (m))
+// 32-bit access
+#if defined(__riscv_a) || defined(__riscv_zaamo) // use atomic RMW instructions
+#define __MMREG32_BSET(r, m) (neorv32_cpu_amoor( (uint32_t)(&r),  (uint32_t)(m)))
+#define __MMREG32_BCLR(r, m) (neorv32_cpu_amoand((uint32_t)(&r), ~(uint32_t)(m)))
+#define __MMREG32_BINV(r, m) (neorv32_cpu_amoxor((uint32_t)(&r),  (uint32_t)(m)))
+#else // use individual load + modify + write instructions
+#define __MMREG32_BSET(r, m) __MMREG_BSET(r, (uint32_t)(m))
+#define __MMREG32_BCLR(r, m) __MMREG_BCLR(r, (uint32_t)(m))
+#define __MMREG32_BINV(r, m) __MMREG_BINV(r, (uint32_t)(m))
+#endif
+// 16-bit access
+#define __MMREG16_BSET(r, m) __MMREG_BSET(r, (uint16_t)(m))
+#define __MMREG16_BCLR(r, m) __MMREG_BCLR(r, (uint16_t)(m))
+#define __MMREG16_BINV(r, m) __MMREG_BTOG(r, (uint16_t)(m))
+// 8-bit access
+#define __MMREG8_BSET(r, m) __MMREG_BSET(r, (uint8_t)(m))
+#define __MMREG8_BCLR(r, m) __MMREG_BCLR(r, (uint8_t)(m))
+#define __MMREG8_BINV(r, m) __MMREG_BTOG(r, (uint8_t)(m))
+/**@}*/
+
+
+/**********************************************************************//**
+ * @name Include all processor header files
+ **************************************************************************/
+/**@{*/
 #include "neorv32_aux.h"
 #include "neorv32_cfs.h"
-#include "neorv32_cfu.h"
 #include "neorv32_clint.h"
 #include "neorv32_cpu.h"
 #include "neorv32_csr.h"
@@ -247,7 +287,6 @@ typedef union {
 #include "neorv32_gpio.h"
 #include "neorv32_gptmr.h"
 #include "neorv32_intrinsics.h"
-#include "neorv32_legacy.h"
 #include "neorv32_neoled.h"
 #include "neorv32_onewire.h"
 #include "neorv32_pwm.h"
@@ -255,6 +294,7 @@ typedef union {
 #include "neorv32_semihosting.h"
 #include "neorv32_sdi.h"
 #include "neorv32_slink.h"
+#include "neorv32_smc.h"
 #include "neorv32_smp.h"
 #include "neorv32_spi.h"
 #include "neorv32_sysinfo.h"
@@ -264,6 +304,7 @@ typedef union {
 #include "neorv32_twi.h"
 #include "neorv32_uart.h"
 #include "neorv32_wdt.h"
+/**@}*/
 
 #ifdef __cplusplus
 }

@@ -1,7 +1,7 @@
 // ================================================================================ //
 // The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              //
 // Copyright (c) NEORV32 contributors.                                              //
-// Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  //
+// Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  //
 // Licensed under the BSD-3-Clause license, see LICENSE for details.                //
 // SPDX-License-Identifier: BSD-3-Clause                                            //
 // ================================================================================ //
@@ -12,28 +12,6 @@
  */
 
 #include <neorv32.h>
-
-
-/**********************************************************************//**
- * Unavailable extensions warnings.
- **************************************************************************/
-/**@{*/
-#if defined __riscv_d || (__riscv_flen == 64)
-  #error Double-precision floating-point extension D/Zdinx is NOT supported!
-#endif
-
-#if (__riscv_xlen > 32)
-  #error Only XLEN=32 (rv32) is supported!
-#endif
-
-#ifdef __riscv_fdiv
-  #warning Floating-point division instruction FDIV is NOT supported!
-#endif
-
-#ifdef __riscv_fsqrt
-  #warning Floating-point square root instruction FSQRT is NOT supported!
-#endif
-/**@}*/
 
 
 /**********************************************************************//**
@@ -53,11 +31,11 @@ uint64_t neorv32_cpu_get_cycle(void) {
     }
   }
 
-  subwords64_t cycles;
-  cycles.uint32[0] = tmp2;
-  cycles.uint32[1] = tmp3;
+  subwords64_t data;
+  data.uint32[0] = tmp2;
+  data.uint32[1] = tmp3;
 
-  return cycles.uint64;
+  return data.uint64;
 }
 
 
@@ -68,13 +46,38 @@ uint64_t neorv32_cpu_get_cycle(void) {
  **************************************************************************/
 void neorv32_cpu_set_mcycle(uint64_t value) {
 
-  subwords64_t cycles;
-  cycles.uint64 = value;
+  subwords64_t data;
+  data.uint64 = value;
 
   // prevent low-to-high carry while writing
   neorv32_cpu_csr_write(CSR_MCYCLE,  0);
-  neorv32_cpu_csr_write(CSR_MCYCLEH, cycles.uint32[1]);
-  neorv32_cpu_csr_write(CSR_MCYCLE,  cycles.uint32[0]);
+  neorv32_cpu_csr_write(CSR_MCYCLEH, data.uint32[1]);
+  neorv32_cpu_csr_write(CSR_MCYCLE,  data.uint32[0]);
+}
+
+
+/**********************************************************************//**
+ * Get system time counter from time[h] (from CLINT.MTIME).
+ *
+ * @return Current system time (64 bit).
+ **************************************************************************/
+uint64_t neorv32_cpu_get_time(void) {
+
+  uint32_t tmp1 = 0, tmp2 = 0, tmp3 = 0;
+  while(1) {
+    tmp1 = neorv32_cpu_csr_read(CSR_TIMEH);
+    tmp2 = neorv32_cpu_csr_read(CSR_TIME);
+    tmp3 = neorv32_cpu_csr_read(CSR_TIMEH);
+    if (tmp1 == tmp3) {
+      break;
+    }
+  }
+
+  subwords64_t data;
+  data.uint32[0] = tmp2;
+  data.uint32[1] = tmp3;
+
+  return data.uint64;
 }
 
 
@@ -95,11 +98,11 @@ uint64_t neorv32_cpu_get_instret(void) {
     }
   }
 
-  subwords64_t cycles;
-  cycles.uint32[0] = tmp2;
-  cycles.uint32[1] = tmp3;
+  subwords64_t data;
+  data.uint32[0] = tmp2;
+  data.uint32[1] = tmp3;
 
-  return cycles.uint64;
+  return data.uint64;
 }
 
 
@@ -110,13 +113,13 @@ uint64_t neorv32_cpu_get_instret(void) {
  **************************************************************************/
 void neorv32_cpu_set_minstret(uint64_t value) {
 
-  subwords64_t cycles;
-  cycles.uint64 = value;
+  subwords64_t data;
+  data.uint64 = value;
 
   // prevent low-to-high carry while writing
   neorv32_cpu_csr_write(CSR_MINSTRET,  0);
-  neorv32_cpu_csr_write(CSR_MINSTRETH, cycles.uint32[1]);
-  neorv32_cpu_csr_write(CSR_MINSTRET,  cycles.uint32[0]);
+  neorv32_cpu_csr_write(CSR_MINSTRETH, data.uint32[1]);
+  neorv32_cpu_csr_write(CSR_MINSTRET,  data.uint32[0]);
 }
 
 
@@ -142,11 +145,7 @@ uint32_t neorv32_cpu_pmp_get_num_regions(void) {
   neorv32_cpu_csr_write(CSR_PMPCFG3, mask);
 
   // sum up all written ones (only available PMPCFG* CSRs/entries will return =! 0)
-  union {
-    uint32_t uint32;
-    uint8_t  uint8[sizeof(uint32_t)/sizeof(uint8_t)];
-  } cnt;
-
+  subwords32_t cnt;
   cnt.uint32 = 0;
   cnt.uint32 += neorv32_cpu_csr_read(CSR_PMPCFG0) & mask;
   cnt.uint32 += neorv32_cpu_csr_read(CSR_PMPCFG1) & mask;
@@ -275,7 +274,7 @@ int neorv32_cpu_pmp_configure_region(int index, uint32_t addr, uint8_t config) {
 /**********************************************************************//**
  * Hardware performance monitors (HPM): Get number of available HPM counters.
  *
- * @warning This function overrides all available HPMCOUNTER* CSRs!
+ * @warning This function overrides all available MHPMCOUNTER* CSRs!
  *
  * @return Returns number of available HPM counters.
  **************************************************************************/
@@ -303,6 +302,22 @@ uint32_t neorv32_cpu_hpm_get_num_counters(void) {
   neorv32_cpu_csr_write(CSR_MHPMCOUNTER13, 1);
   neorv32_cpu_csr_write(CSR_MHPMCOUNTER14, 1);
   neorv32_cpu_csr_write(CSR_MHPMCOUNTER15, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER16, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER17, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER18, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER19, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER20, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER21, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER22, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER23, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER24, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER25, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER26, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER27, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER28, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER29, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER30, 1);
+  neorv32_cpu_csr_write(CSR_MHPMCOUNTER31, 1);
 
   // sum-up all actually set HPMs
   uint32_t num_hpm = 0;
@@ -319,6 +334,22 @@ uint32_t neorv32_cpu_hpm_get_num_counters(void) {
   num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER13);
   num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER14);
   num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER15);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER16);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER17);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER18);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER19);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER20);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER21);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER22);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER23);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER24);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER25);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER26);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER27);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER28);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER29);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER30);
+  num_hpm += neorv32_cpu_csr_read(CSR_MHPMCOUNTER31);
 
   return num_hpm;
 }
@@ -360,6 +391,36 @@ uint32_t neorv32_cpu_hpm_get_size(void) {
   while (tmp) {
     cnt++;
     tmp >>= 1;
+  }
+
+  return cnt;
+}
+
+
+/**********************************************************************//**
+ * Hardware trigger module: get number of implemented triggers.
+ *
+ * @return Number of HW triggers (0 if not implemented at all).
+ **************************************************************************/
+int neorv32_cpu_hwtrig_get_number(void) {
+
+  int cnt = 0;
+  uint32_t sel = 0;
+
+  if ((neorv32_cpu_csr_read(CSR_MXISA) & (1<<CSR_MXISA_SDTRIG)) == 0) {
+    return 0;
+  }
+
+  while (1) {
+    neorv32_cpu_csr_write(CSR_TSELECT, sel);
+    if ((neorv32_cpu_csr_read(CSR_TSELECT) == sel) &&
+       ((neorv32_cpu_csr_read(CSR_TINFO) & 0x0000FFFF) != 1)) {
+      cnt++;
+    }
+    else {
+      break;
+    }
+    sel++;
   }
 
   return cnt;

@@ -1,7 +1,7 @@
 // ================================================================================ //
 // The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              //
 // Copyright (c) NEORV32 contributors.                                              //
-// Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  //
+// Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  //
 // Licensed under the BSD-3-Clause license, see LICENSE for details.                //
 // SPDX-License-Identifier: BSD-3-Clause                                            //
 // ================================================================================ //
@@ -14,8 +14,8 @@
 #ifndef NEORV32_TWI_H
 #define NEORV32_TWI_H
 
+#include <neorv32.h>
 #include <stdint.h>
-
 
 /**********************************************************************//**
  * @name IO Device: Two-Wire Interface Controller (TWI)
@@ -85,17 +85,14 @@ void neorv32_twi_setup(int prsc, int cdiv, int clkstr);
 int  neorv32_twi_get_fifo_depth(void);
 void neorv32_twi_disable(void);
 void neorv32_twi_enable(void);
-
 int  neorv32_twi_sense_scl(void);
 int  neorv32_twi_sense_sda(void);
-
 int  neorv32_twi_busy(void);
 int  neorv32_twi_get(uint8_t *data);
-
+void neorv32_twi_get_discard(void);
 int  neorv32_twi_transfer(uint8_t *data, int mack);
 void neorv32_twi_generate_stop(void);
 void neorv32_twi_generate_start(void);
-
 void neorv32_twi_send_nonblocking(uint8_t data, int mack);
 void neorv32_twi_generate_stop_nonblocking(void);
 void neorv32_twi_generate_start_nonblocking(void);

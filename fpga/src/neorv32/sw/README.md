@@ -5,9 +5,8 @@ and helpers of the NEORV32 software framework.
 
 ### > [`bootloader`](bootloader)
 
-Source(s) of the default NEORV32 bootloader.
-A pre-built image is already installed into the rtl design via the
-`rtl/core/neorv32_bootloader_image.vhd` file.
+Source(s) of the default NEORV32 bootloader. A pre-built image is already installed
+by the default `rtl/core/neorv32_bootloader_image.vhd` file.
 
 ### > [`common`](common)
 
@@ -20,7 +19,7 @@ Several example/demo programs for testing and for getting started.
 
 ### > [`image_gen`](image_gen)
 
-Helper program to generate NEORV32 executables (for upload via bootloader) and VHDL
+Helper program to generate NEORV32 executables (e.g. for upload via bootloader) and
 memory initialization files. This program is automatically compiled when
 executing one of the application compilation makefile targets.
 

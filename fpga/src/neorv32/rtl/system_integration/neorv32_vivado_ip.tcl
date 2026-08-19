@@ -6,7 +6,7 @@
 # -- -------------------------------------------------------------------------------- --
 # -- The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              --
 # -- Copyright (c) NEORV32 contributors.                                              --
-# -- Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  --
+# -- Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  --
 # -- Licensed under the BSD-3-Clause license, see LICENSE for details.                --
 # -- SPDX-License-Identifier: BSD-3-Clause                                            --
 # -- ================================================================================ --
@@ -46,8 +46,8 @@ set_property INCREMENTAL false [get_filesets sim_1]
 # **************************************************************
 
 # read and process NEORV32 SoC file list
-set file_list_file [read [open "$neorv32_home/rtl/file_list_soc.f" r]]
-set file_list [string map [list "NEORV32_RTL_PATH_PLACEHOLDER" "$neorv32_home/rtl"] $file_list_file]
+set file_list_file [read [open "$neorv32_home/rtl/file_list_core.f" r]]
+set file_list [string map [list {$NEORV32_HOME} $neorv32_home] $file_list_file]
 puts "NEORV32 source files:"
 puts $file_list
 add_files $file_list
@@ -66,7 +66,7 @@ update_compile_order -fileset sources_1
 # **************************************************************
 ipx::package_project -root_dir $outputdir/packaged_ip -vendor NEORV32 -library user -taxonomy /UserIP -import_files -set_current true -force
 set_property display_name "NEORV32" [ipx::current_core]
-set_property vendor_display_name "Stephan Nolting" [ipx::current_core]
+set_property vendor_display_name "neorv32" [ipx::current_core]
 set_property company_url https://github.com/stnolting/neorv32 [ipx::current_core]
 set_property description "The NEORV32 RISC-V Processor" [ipx::current_core]
 
@@ -119,26 +119,29 @@ proc setup_ip_gui {} {
   # **************************************************************
   # Interfaces: Configuration Dependencies
   # **************************************************************
-  set_property enablement_dependency {$OCD_EN}        [ipx::get_ports jtag_*           -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$OCD_EN}        [ipx::get_ports ocd_resetn       -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_WDT_EN}     [ipx::get_ports wdt_resetn       -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_SLINK_EN}   [ipx::get_bus_interfaces s0_axis -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_SLINK_EN}   [ipx::get_bus_interfaces s1_axis -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$XBUS_EN}       [ipx::get_bus_interfaces m_axi   -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_GPIO_EN}    [ipx::get_ports gpio_*           -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_UART0_EN}   [ipx::get_ports uart0_*          -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_UART1_EN}   [ipx::get_ports uart1_*          -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_SPI_EN}     [ipx::get_ports spi_*            -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_SDI_EN}     [ipx::get_ports sdi_*            -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_TWI_EN}     [ipx::get_ports twi_*            -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_TWD_EN}     [ipx::get_ports twd_*            -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_ONEWIRE_EN} [ipx::get_ports onewire_*        -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_PWM_EN}     [ipx::get_ports pwm_o            -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_CFS_EN}     [ipx::get_ports cfs_*            -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_NEOLED_EN}  [ipx::get_ports neoled_o         -of_objects [ipx::current_core]]
-  set_property enablement_dependency {$IO_CLINT_EN}   [ipx::get_ports mtime_time_o     -of_objects [ipx::current_core]]
-  set_property enablement_dependency {!$IO_CLINT_EN}  [ipx::get_ports mtime_irq_i      -of_objects [ipx::current_core]]
-  set_property enablement_dependency {!$IO_CLINT_EN}  [ipx::get_ports msw_irq_i        -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$OCD_EN}         [ipx::get_ports jtag_*           -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$OCD_EN}         [ipx::get_ports ocd_resetn       -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_WDT_EN}      [ipx::get_ports wdt_resetn       -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_SLINK_EN}    [ipx::get_bus_interfaces s0_axis -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_SLINK_EN}    [ipx::get_bus_interfaces s1_axis -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$XBUS_EN}        [ipx::get_bus_interfaces m_axi   -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_GPIO_EN}     [ipx::get_ports gpio_i           -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_GPIO_EN}     [ipx::get_ports gpio_o           -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_GPIO_DIR_EN} [ipx::get_ports gpio_dir_o       -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_UART0_EN}    [ipx::get_ports uart0_*          -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_UART1_EN}    [ipx::get_ports uart1_*          -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_SPI_EN}      [ipx::get_ports spi_*            -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_SDI_EN}      [ipx::get_ports sdi_*            -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_TWI_EN}      [ipx::get_ports twi_*            -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_TWD_EN}      [ipx::get_ports twd_*            -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_ONEWIRE_EN}  [ipx::get_ports onewire_*        -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_PWM_EN}      [ipx::get_ports pwm_o            -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_CFS_EN}      [ipx::get_ports cfs_*            -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_NEOLED_EN}   [ipx::get_ports neoled_o         -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$IO_CLINT_EN}    [ipx::get_ports mtime_time_o     -of_objects [ipx::current_core]]
+  set_property enablement_dependency {!$IO_CLINT_EN}   [ipx::get_ports irq_mti_i        -of_objects [ipx::current_core]]
+  set_property enablement_dependency {!$IO_CLINT_EN}   [ipx::get_ports irq_msi_i        -of_objects [ipx::current_core]]
+  set_property enablement_dependency {$SMC_EN}         [ipx::get_ports smc_*            -of_objects [ipx::current_core]]
 
 
   # **************************************************************
@@ -195,8 +198,9 @@ proc setup_ip_gui {} {
 
   set group [add_group $page {Execution Trace Buffer (TRACER)}]
   add_params $group {
-    { IO_TRACER_EN     {Enable tracer}      {Implement execution tracer module} }
-    { IO_TRACER_BUFFER {Trace buffer depth} {Maximum number of logged execution deltas} {$IO_TRACER_EN} {$IO_TRACER_EN ? $IO_TRACER_BUFFER : 1} }
+    { IO_TRACER_EN        {Enable tracer}      {Implement execution tracer module} }
+    { IO_TRACER_BUFFER    {Trace buffer depth} {Maximum number of logged execution deltas}    {$IO_TRACER_EN} {$IO_TRACER_EN ? $IO_TRACER_BUFFER : 1} }
+    { IO_TRACER_SIMLOG_EN {Simulation logging} {Generate full trace log; only for simulation} {$IO_TRACER_EN} }
   }
 
 
@@ -250,16 +254,18 @@ proc setup_ip_gui {} {
 
   set group [add_group $page {Counters and Timers}]
   add_params $group {
-    { RISCV_ISA_Zicntr {Zicntr - Base counters (cycles and instructions)} {} }
-    { RISCV_ISA_Zihpm  {Zihpm - Hardware performance monitors (HPMs)}     {} }
-    { HPM_CNT_WIDTH    {HPM width}                                        {Counter width in bits}  {$RISCV_ISA_Zihpm} }
-    { HPM_NUM_CNTS     {HPM counters}                                     {Number of HPM counters} {$RISCV_ISA_Zihpm} }
+    { RISCV_ISA_Zicntr    {Zicntr - Base counters (cycles and instructions)} {} }
+    { RISCV_ISA_Smcntrpmf {Smcntrpmf - Counter privilege-mode filtering}     {} }
+    { RISCV_ISA_Zihpm     {Zihpm - Hardware performance monitors (HPMs)}     {} }
+    { HPM_CNT_WIDTH       {HPM width}                                        {Counter width in bits}  {$RISCV_ISA_Zihpm} }
+    { HPM_NUM_CNTS        {HPM counters}                                     {Number of HPM counters} {$RISCV_ISA_Zihpm} }
   }
 
-  set group [add_group $page {Bit-Manipulation}]
+  set group [add_group $page {Bit-Manipulation (B)}]
   add_params $group {
     { RISCV_ISA_Zba {Zba - Shifted-add bit-manipulation instructions} {} }
     { RISCV_ISA_Zbb {Zbb - Basic bit-manipulation instructions}       {} }
+    { RISCV_ISA_Zbc {Zbc - Carry-less multiplication instructions}    {} }
     { RISCV_ISA_Zbs {Zbs - Single-bit bit-manipulation instructions}  {} }
   }
 
@@ -283,9 +289,12 @@ proc setup_ip_gui {} {
 
   set group [add_group $page {Miscelanous}]
   add_params $group {
-    { RISCV_ISA_Zicond {Zicond - Conditional-move instructions}             {} }
     { RISCV_ISA_Zfinx  {Zfinx - Embedded FPU (using integer register file)} {} }
-    { RISCV_ISA_Zxcfu  {Zxcfu - Custom-instructions unit (user-defined)}    {} }
+    { RISCV_ISA_Zibi   {Zibi - Branch with immediate-comparison}            {} }
+    { RISCV_ISA_Zicond {Zicond - Conditional-move instructions}             {} }
+    { RISCV_ISA_Zimop  {Zimop - May-be-operation}                           {} }
+    { RISCV_ISA_Zcmop  {Zcmop - Compressed may-be-operation}                {} {$RISCV_ISA_C && $RISCV_ISA_Zimop} {$RISCV_ISA_C && $RISCV_ISA_Zimop ? $RISCV_ISA_Zcmop : false}}
+    { RISCV_ISA_Xcfu   {Xcfu - Custom-instructions unit (user-defined)}     {} }
   }
 
   set group [add_group $page {Physical Memory Protection (PMP)}]
@@ -299,20 +308,24 @@ proc setup_ip_gui {} {
 
   set group [add_group $page {Tuning Options}]
   add_params $group {
-    { CPU_CONSTT_BR_EN  {Constant-time branches}                {Identical execution times for taken and not-taken branches} }
-    { CPU_FAST_MUL_EN   {DSP-based multiplier}                  {Use DSP block instead of bit-serial multipliers} }
-    { CPU_FAST_SHIFT_EN {Barrel shifter}                        {Use full-parallel shifters instead of of bit-serial shifters} }
-    { CPU_RF_HW_RST_EN  {Full hardware reset for register file} {Implement register file with FFs instead of BRAM to allow full hardware reset} }
+    { CPU_CONSTT_BR_EN  {Constant-time branches} {Identical execution times for taken and not-taken branches} }
+    { CPU_FAST_MUL_EN   {DSP-based multiplier}   {Use DSP block instead of bit-serial multipliers} }
+    { CPU_FAST_MUL_REG  {Multiplier register}    {Add a pipeline register to the DSP-based multiplier to improve timing closure} }
+    { CPU_FAST_SHIFT_EN {Barrel shifter}         {Use full-parallel shifters instead of of bit-serial shifters} }
+    { CPU_RF_ARCH_SEL   {Register file style}    {Select implementation style of CPU register file} }
   }
+  set_property widget {comboBox} [ipgui::get_guiparamspec -name "CPU_RF_ARCH_SEL" -component [ipx::current_core] ]
+  set_property value_validation_type pairs [ipx::get_user_parameters CPU_RF_ARCH_SEL -of_objects [ipx::current_core]]
+  set_property value_validation_pairs {{Block RAM} 0 {Distributed RAM} 1 {FFs with reset} 2 {Latches} 3} [ipx::get_user_parameters CPU_RF_ARCH_SEL -of_objects [ipx::current_core]]
 
 
   # **************************************************************
   # GUI Page: Memory
   # **************************************************************
   set page [add_page {Memory}]
-  set mem_note "The memory sizes need to be exported to the linker via dedicated symbols. Example:"
-  set imem_note "IMEM size (32kB): -Wl,--defsym,__neorv32_rom_size=32k"
-  set dmem_note "DMEM size (16kB): -Wl,--defsym,__neorv32_ram_size=16k"
+  set mem_note "The memory sizes & base addresses need to be exported to the linker via dedicated symbols. Example:"
+  set imem_note "IMEM 32kB @ 0x00000000: -Wl,--defsym,__neorv32_rom_size=32k -Wl,--defsym,__neorv32_rom_base=0x00000000"
+  set dmem_note "DMEM 16kB @ 0x80000000: -Wl,--defsym,__neorv32_ram_size=16k -Wl,--defsym,__neorv32_ram_base=0x80000000"
   ipgui::add_static_text -name {MEM note}  -component [ipx::current_core] -parent [ipgui::get_pagespec -name "Memory" -component [ipx::current_core] ] -text $mem_note
   ipgui::add_static_text -name {IMEM note} -component [ipx::current_core] -parent [ipgui::get_pagespec -name "Memory" -component [ipx::current_core] ] -text $imem_note
   ipgui::add_static_text -name {DMEM note} -component [ipx::current_core] -parent [ipgui::get_pagespec -name "Memory" -component [ipx::current_core] ] -text $dmem_note
@@ -320,6 +333,7 @@ proc setup_ip_gui {} {
   set group [add_group $page {Internal Instruction Memory (IMEM)}]
   add_params $group {
     { IMEM_EN        {Enable internal IMEM} }
+    { IMEM_BASE      {IMEM base address}     {Naturally-aligned to its size}                     {$IMEM_EN} }
     { IMEM_SIZE      {IMEM size (bytes)}     {Use a power of two}                                {$IMEM_EN} }
     { IMEM_OUTREG_EN {Output register stage} {Improves mapping/timing at the expense of latency} {$IMEM_EN} }
   }
@@ -327,8 +341,15 @@ proc setup_ip_gui {} {
   set group [add_group $page {Internal Data Memory (DMEM)}]
   add_params $group {
     { DMEM_EN        {Enable internal DMEM} }
+    { DMEM_BASE      {DMEM base address}     {Naturally-aligned to its size}                     {$DMEM_EN} }
     { DMEM_SIZE      {DMEM size (bytes)}     {Use a power of two}                                {$DMEM_EN} }
     { DMEM_OUTREG_EN {Output register stage} {Improves mapping/timing at the expense of latency} {$DMEM_EN} }
+  }
+
+  set group [add_group $page {Serial Memory Controller (SMC)}]
+  add_params $group {
+    { SMC_EN   {Enable serial memeory controller} }
+    { SMC_BASE {Serial memory base address} {top 4 MSBs only / 256MB aligned} {$SMC_EN} }
   }
 
 
@@ -337,21 +358,22 @@ proc setup_ip_gui {} {
   # **************************************************************
   set page [add_page {Caches}]
 
-  set group [add_group $page {Cache Line Size}]
+  set group [add_group $page {General}]
   add_params $group {
-    { CACHE_BLOCK_SIZE {Size in bytes} {Has to be a power a power of two} }
+    { CACHE_BLOCK_SIZE {Cache line size (bytes)} {Has to be a power a power of two} }
+    { CACHE_UC_BASE    {Uncached base address}   {Has to be 256MB-aligned} }
   }
 
   set group [add_group $page {Instruction Cache (I-Cache)}]
   add_params $group {
     { ICACHE_EN         {Enable I-Cache} }
-    { ICACHE_NUM_BLOCKS {Number of I-Cache lines} {Use a power of two} {$ICACHE_EN} }
+    { ICACHE_NUM_BLOCKS {Number of lines} {Use a power of two} {$ICACHE_EN} }
   }
 
   set group [add_group $page {Data Cache (D-Cache)}]
   add_params $group {
     { DCACHE_EN         {Enable D-Cache} }
-    { DCACHE_NUM_BLOCKS {Number of D-Cache lines} {Use a power of two} {$DCACHE_EN} }
+    { DCACHE_NUM_BLOCKS {Number of lines} {Use a power of two} {$DCACHE_EN} }
   }
 
 
@@ -363,8 +385,10 @@ proc setup_ip_gui {} {
   set group [add_group $page {General-Purpose Inputs/Outputs (GPIO)}]
   add_params $group {
     { IO_GPIO_EN      {Enable GPIO} }
-    { IO_GPIO_IN_NUM  {Inputs (IRQ-capable)} {} {$IO_GPIO_EN} }
-    { IO_GPIO_OUT_NUM {Outputs}              {} {$IO_GPIO_EN} }
+    { IO_GPIO_IN_NUM  {Inputs (IRQ-capable)}      {} {$IO_GPIO_EN} }
+    { IO_GPIO_OUT_NUM {Outputs}                   {} {$IO_GPIO_EN} }
+    { IO_GPIO_DIR_EN  {Enable direction control}  {} {$IO_GPIO_EN} {$IO_GPIO_EN ? $IO_GPIO_DIR_EN : false} }
+    { IO_GPIO_DIR_NUM {Direction control outputs} {} {$IO_GPIO_DIR_EN} }
   }
 
   set group [add_group $page {Core Local Interruptor (CLINT)}]
@@ -413,8 +437,8 @@ proc setup_ip_gui {} {
 
   set group [add_group $page {Pulse-Width Modulation Controller (PWM)}]
   add_params $group {
-    { IO_PWM_EN     {Enable PWM} }
-    { IO_PWM_NUM_CH {Channels} {} {$IO_PWM_EN} }
+    { IO_PWM_EN  {Enable PWM} }
+    { IO_PWM_NUM {Number of PWM channels} {} {$IO_PWM_EN} }
   }
 
   set group [add_group $page {Watchdog Timer (WDT)}]
@@ -424,8 +448,11 @@ proc setup_ip_gui {} {
 
   set group [add_group $page {True Random-Number Generator (TRNG)}]
   add_params $group {
-    { IO_TRNG_EN   {Enable TRNG} }
-    { IO_TRNG_FIFO {FIFO depth} {Number of entries (use a power of two)} {$IO_TRNG_EN} }
+    { IO_TRNG_EN        {Enable TRNG} }
+    { IO_TRNG_FIFO      {FIFO depth}    {Number of entries (use a power of two)}                          {$IO_TRNG_EN} }
+    { IO_TRNG_NUM_RO    {Number of ROs} {Number of ring-oscillators}                                      {$IO_TRNG_EN} }
+    { IO_TRNG_NUM_INV   {1st RO length} {Length of first ring-oscillator (has to be odd)}                 {$IO_TRNG_EN} }
+    { IO_TRNG_NUM_RBIT  {Sample length} {Number of raw random bits per output bytes (use a power of two)} {$IO_TRNG_EN} }
   }
 
   set group [add_group $page {Custom Functions Subsystem (CFS)}]
@@ -441,7 +468,8 @@ proc setup_ip_gui {} {
 
   set group [add_group $page {General Purpose Timer (GPTMR)}]
   add_params $group {
-    { IO_GPTMR_EN {Enable GPTMR} }
+    { IO_GPTMR_EN  {Enable GPTMR} }
+    { IO_GPTMR_NUM {Number of independent timer slices} }
   }
 
   set group [add_group $page {One-Wire Interface Controller (ONEWIRE)}]

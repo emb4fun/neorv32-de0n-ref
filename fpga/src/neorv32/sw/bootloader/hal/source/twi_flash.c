@@ -1,7 +1,7 @@
 // ================================================================================ //
 // The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              //
 // Copyright (c) NEORV32 contributors.                                              //
-// Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  //
+// Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  //
 // Licensed under the BSD-3-Clause license, see LICENSE for details.                //
 // SPDX-License-Identifier: BSD-3-Clause                                            //
 // ================================================================================ //
@@ -12,10 +12,8 @@
  */
 
 #include <neorv32.h>
-#include <system.h>
 #include <config.h>
 #include <twi_flash.h>
-#include <uart.h>
 
 // global variables
 extern uint32_t g_flash_addr;
@@ -78,7 +76,6 @@ static int twi_transfer_byte(int write, uint8_t* data) {
 
   // transfer data byte
   if (write) {
-    tmp = *data;
     if (neorv32_twi_transfer(data, 0)) { // abort if NACK
       return 1;
     }
@@ -175,7 +172,7 @@ int twi_flash_stream_get(uint32_t* rdata) {
 
 
 /**********************************************************************//**
- * Write stream word to SPI flash.
+ * Write stream word to TWI flash.
  *
  * @param wdata TWI flash write data.
  * @return 0 if success, !=0 if error

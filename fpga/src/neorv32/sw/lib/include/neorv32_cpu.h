@@ -1,7 +1,7 @@
 // ================================================================================ //
 // The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              //
 // Copyright (c) NEORV32 contributors.                                              //
-// Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  //
+// Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  //
 // Licensed under the BSD-3-Clause license, see LICENSE for details.                //
 // SPDX-License-Identifier: BSD-3-Clause                                            //
 // ================================================================================ //
@@ -14,8 +14,8 @@
 #ifndef NEORV32_CPU_H
 #define NEORV32_CPU_H
 
+#include <neorv32.h>
 #include <stdint.h>
-
 
 /**********************************************************************//**
  * @name Prototypes
@@ -23,6 +23,7 @@
 /**@{*/
 uint64_t neorv32_cpu_get_cycle(void);
 void     neorv32_cpu_set_mcycle(uint64_t value);
+uint64_t neorv32_cpu_get_time(void);
 uint64_t neorv32_cpu_get_instret(void);
 void     neorv32_cpu_set_minstret(uint64_t value);
 uint32_t neorv32_cpu_pmp_get_num_regions(void);
@@ -30,6 +31,7 @@ uint32_t neorv32_cpu_pmp_get_granularity(void);
 int      neorv32_cpu_pmp_configure_region(int index, uint32_t addr, uint8_t config);
 uint32_t neorv32_cpu_hpm_get_num_counters(void);
 uint32_t neorv32_cpu_hpm_get_size(void);
+int      neorv32_cpu_hwtrig_get_number(void);
 /**@}*/
 
 
@@ -254,7 +256,7 @@ inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_csr_swap(const int c
  **************************************************************************/
 inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amolr(uint32_t addr) {
 
-#if defined __riscv_atomic
+#if defined(__riscv_a) || defined(__riscv_zalrsc)
   uint32_t amo_addr = addr;
   uint32_t amo_rdata;
 
@@ -281,7 +283,7 @@ inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amolr(uint32_t addr)
  **************************************************************************/
 inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amosc(uint32_t addr, uint32_t wdata) {
 
-#if defined __riscv_atomic
+#if defined(__riscv_a) || defined(__riscv_zalrsc)
   uint32_t amo_addr  = addr;
   uint32_t amo_wdata = wdata;
   uint32_t amo_status;
@@ -306,11 +308,11 @@ inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amosc(uint32_t addr,
  *
  * @param[in] addr Address (32-bit).
  * @param[in] wdata Operand data for read-modify-write operation (32-bit).
- * @return Status: Pre-operation memory content
+ * @return Pre-operation memory content
  **************************************************************************/
 inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amoswap(uint32_t addr, uint32_t wdata) {
 
-#if defined __riscv_atomic
+#if defined(__riscv_a) || defined(__riscv_zaamo)
   uint32_t amo_addr  = addr;
   uint32_t amo_wdata = wdata;
   uint32_t amo_rdata;
@@ -335,11 +337,11 @@ inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amoswap(uint32_t add
  *
  * @param[in] addr Address (32-bit).
  * @param[in] wdata Operand data for read-modify-write operation (32-bit).
- * @return Status: Pre-operation memory content
+ * @return Pre-operation memory content
  **************************************************************************/
 inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amoadd(uint32_t addr, uint32_t wdata) {
 
-#if defined __riscv_atomic
+#if defined(__riscv_a) || defined(__riscv_zaamo)
   uint32_t amo_addr  = addr;
   uint32_t amo_wdata = wdata;
   uint32_t amo_rdata;
@@ -364,11 +366,11 @@ inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amoadd(uint32_t addr
  *
  * @param[in] addr Address (32-bit).
  * @param[in] wdata Operand data for read-modify-write operation (32-bit).
- * @return Status: Pre-operation memory content
+ * @return Pre-operation memory content
  **************************************************************************/
 inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amoxor(uint32_t addr, uint32_t wdata) {
 
-#if defined __riscv_atomic
+#if defined(__riscv_a) || defined(__riscv_zaamo)
   uint32_t amo_addr  = addr;
   uint32_t amo_wdata = wdata;
   uint32_t amo_rdata;
@@ -393,11 +395,11 @@ inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amoxor(uint32_t addr
  *
  * @param[in] addr Address (32-bit).
  * @param[in] wdata Operand data for read-modify-write operation (32-bit).
- * @return Status: Pre-operation memory content
+ * @return Pre-operation memory content
  **************************************************************************/
 inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amoand(uint32_t addr, uint32_t wdata) {
 
-#if defined __riscv_atomic
+#if defined(__riscv_a) || defined(__riscv_zaamo)
   uint32_t amo_addr  = addr;
   uint32_t amo_wdata = wdata;
   uint32_t amo_rdata;
@@ -422,11 +424,11 @@ inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amoand(uint32_t addr
  *
  * @param[in] addr Address (32-bit).
  * @param[in] wdata Operand data for read-modify-write operation (32-bit).
- * @return Status: Pre-operation memory content
+ * @return Pre-operation memory content
  **************************************************************************/
 inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amoor(uint32_t addr, uint32_t wdata) {
 
-#if defined __riscv_atomic
+#if defined(__riscv_a) || defined(__riscv_zaamo)
   uint32_t amo_addr  = addr;
   uint32_t amo_wdata = wdata;
   uint32_t amo_rdata;
@@ -451,11 +453,11 @@ inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amoor(uint32_t addr,
  *
  * @param[in] addr Address (32-bit).
  * @param[in] wdata Operand data for read-modify-write operation (32-bit).
- * @return Status: Pre-operation memory content
+ * @return Pre-operation memory content
  **************************************************************************/
 inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amomin(uint32_t addr, uint32_t wdata) {
 
-#if defined __riscv_atomic
+#if defined(__riscv_a) || defined(__riscv_zaamo)
   uint32_t amo_addr  = addr;
   uint32_t amo_wdata = wdata;
   uint32_t amo_rdata;
@@ -480,11 +482,11 @@ inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amomin(uint32_t addr
  *
  * @param[in] addr Address (32-bit).
  * @param[in] wdata Operand data for read-modify-write operation (32-bit).
- * @return Status: Pre-operation memory content
+ * @return Pre-operation memory content
  **************************************************************************/
 inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amomax(uint32_t addr, uint32_t wdata) {
 
-#if defined __riscv_atomic
+#if defined(__riscv_a) || defined(__riscv_zaamo)
   uint32_t amo_addr  = addr;
   uint32_t amo_wdata = wdata;
   uint32_t amo_rdata;
@@ -509,11 +511,11 @@ inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amomax(uint32_t addr
  *
  * @param[in] addr Address (32-bit).
  * @param[in] wdata Operand data for read-modify-write operation (32-bit).
- * @return Status: Pre-operation memory content
+ * @return Pre-operation memory content
  **************************************************************************/
 inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amominu(uint32_t addr, uint32_t wdata) {
 
-#if defined __riscv_atomic
+#if defined(__riscv_a) || defined(__riscv_zaamo)
   uint32_t amo_addr  = addr;
   uint32_t amo_wdata = wdata;
   uint32_t amo_rdata;
@@ -538,11 +540,11 @@ inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amominu(uint32_t add
  *
  * @param[in] addr Address (32-bit).
  * @param[in] wdata Operand data for read-modify-write operation (32-bit).
- * @return Status: Pre-operation memory content
+ * @return Pre-operation memory content
  **************************************************************************/
 inline uint32_t __attribute__ ((always_inline)) neorv32_cpu_amomaxu(uint32_t addr, uint32_t wdata) {
 
-#if defined __riscv_atomic
+#if defined(__riscv_a) || defined(__riscv_zaamo)
   uint32_t amo_addr  = addr;
   uint32_t amo_wdata = wdata;
   uint32_t amo_rdata;

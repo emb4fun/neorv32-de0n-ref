@@ -4,7 +4,7 @@
   <vendor>github.com/stnolting/neorv32</vendor>
   <name>neorv32</name>
   <series>RISC-V</series>
-  <version>1.12.3</version>
+  <version>1.13.4</version>
   <description>The NEORV32 RISC-V Processor</description>
 
   <!-- CPU core -->
@@ -24,17 +24,18 @@
   </cpu>
 
   <!-- defaults for all peripherals -->
-  <addressUnitBits>8</addressUnitBits>
+  <addressUnitBits>16</addressUnitBits>
   <width>32</width>
   <size>32</size>
   <access>read-write</access>
   <resetValue>0x00000000</resetValue>
-  <resetMask>0x00000000</resetMask> <!-- default IO devices do not have a dedicated reset -->
+  <resetMask>0xffffffff</resetMask>
 
   <!-- Peripherals -->
   <peripherals>
 
-    <!-- CFS -->
+    <!-- **************************************************************** -->
+    <!-- CFS                                                              -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>CFS</name>
@@ -117,7 +118,8 @@
       </registers>
     </peripheral>
 
-    <!-- SDI -->
+    <!-- **************************************************************** -->
+    <!-- SDI                                                              -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>SDI</name>
@@ -146,11 +148,13 @@
             <field>
               <name>SDI_CTRL_CLR_RX</name>
               <bitRange>[1:1]</bitRange>
+              <access>write-only</access>
               <description>Clear RX FIFO, flag auto-clears</description>
             </field>
             <field>
               <name>SDI_CTRL_CLR_TX</name>
               <bitRange>[2:2]</bitRange>
+              <access>write-only</access>
               <description>Clear TX FIFO, flag auto-clears</description>
             </field>
             <field>
@@ -193,7 +197,7 @@
             </field>
             <field>
               <name>SDI_CTRL_TX_FULL</name>
-              <bitRange>[28:28]</bitRange>
+              <bitRange>[27:27]</bitRange>
               <access>read-only</access>
               <description>TX FIFO full</description>
             </field>
@@ -207,14 +211,22 @@
         </register>
         <register>
           <name>DATA</name>
-          <description>RX/TX data register (lowest 8 bit)</description>
+          <description>RX/TX data register</description>
           <addressOffset>0x04</addressOffset>
           <readAction>modify</readAction>
+          <fields>
+            <field>
+              <name>SDI_DATA</name>
+              <bitRange>[7:0]</bitRange>
+              <description>RX data / TX data (via FIFOs)</description>
+            </field>
+          </fields>
         </register>
       </registers>
     </peripheral>
 
-    <!-- SLINK -->
+    <!-- **************************************************************** -->
+    <!-- SLINK                                                            -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>SLINK</name>
@@ -330,7 +342,8 @@
       </registers>
     </peripheral>
 
-    <!-- DMA -->
+    <!-- **************************************************************** -->
+    <!-- DMA                                                              -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>DMA</name>
@@ -415,7 +428,8 @@
       </registers>
     </peripheral>
 
-    <!-- PWM -->
+    <!-- **************************************************************** -->
+    <!-- PWM                                                              -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>PWM</name>
@@ -424,122 +438,60 @@
 
       <addressBlock>
         <offset>0</offset>
-        <size>0x40</size>
+        <size>0x100</size>
         <usage>registers</usage>
       </addressBlock>
 
       <registers>
         <register>
-          <name>CHANNEL_CFG[0]</name>
-          <description>Channel 0 configuration register</description>
+          <name>ENABLE</name>
+          <description>Channel enable</description>
           <addressOffset>0x00</addressOffset>
-          <fields>
-            <field>
-              <name>PWM_CFG_DUTY</name>
-              <bitRange>[7:0]</bitRange>
-              <description>Duty cycle</description>
-            </field>
-            <field>
-              <name>PWM_CFG_CDIV</name>
-              <bitRange>[17:8]</bitRange>
-              <description>Clock divider</description>
-            </field>
-            <field>
-              <name>PWM_CFG_POL</name>
-              <bitRange>[27:27]</bitRange>
-              <description>Channel polarity, inverted when set</description>
-            </field>
-            <field>
-              <name>PWM_CFG_PRSC</name>
-              <bitRange>[30:28]</bitRange>
-              <description>Clock prescaler select</description>
-            </field>
-            <field>
-              <name>PWM_CFG_EN</name>
-              <bitRange>[31:31]</bitRange>
-              <description>Channel enable</description>
-            </field>
-          </fields>
         </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[1]</name>
-          <description>Channel 1 configuration register</description>
+        <register>
+          <name>POLARITY</name>
+          <description>Channel polarity</description>
           <addressOffset>0x04</addressOffset>
         </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[2]</name>
-          <description>Channel 2 configuration register</description>
+        <register>
+          <name>CLKPRSC</name>
+          <description>Clock prescaler select</description>
           <addressOffset>0x08</addressOffset>
         </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[3]</name>
-          <description>Channel 3 configuration register</description>
+        <register>
+          <name>MODE</name>
+          <description>Channel operation mode (0 = fast-PWM; 1 = phase-correct PWM)</description>
           <addressOffset>0x0C</addressOffset>
         </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[4]</name>
-          <description>Channel 4 configuration register</description>
-          <addressOffset>0x10</addressOffset>
-        </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[5]</name>
-          <description>Channel 5 configuration register</description>
-          <addressOffset>0x14</addressOffset>
-        </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[6]</name>
-          <description>Channel 6 configuration register</description>
-          <addressOffset>0x18</addressOffset>
-        </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[7]</name>
-          <description>Channel 7 configuration register</description>
-          <addressOffset>0x1C</addressOffset>
-        </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[8]</name>
-          <description>Channel 8 configuration register</description>
-          <addressOffset>0x20</addressOffset>
-        </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[9]</name>
-          <description>Channel 9 configuration register</description>
-          <addressOffset>0x24</addressOffset>
-        </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[10]</name>
-          <description>Channel 10 configuration register</description>
-          <addressOffset>0x28</addressOffset>
-        </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[11]</name>
-          <description>Channel 11 configuration register</description>
-          <addressOffset>0x2C</addressOffset>
-        </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[12]</name>
-          <description>Channel 12 configuration register</description>
-          <addressOffset>0x30</addressOffset>
-        </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[13]</name>
-          <description>Channel 13 configuration register</description>
-          <addressOffset>0x34</addressOffset>
-        </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[14]</name>
-          <description>Channel 14 configuration register</description>
-          <addressOffset>0x38</addressOffset>
-        </register>
-        <register derivedFrom="CHANNEL_CFG[0]">
-          <name>CHANNEL_CFG[15]</name>
-          <description>Channel 15 configuration register</description>
-          <addressOffset>0x3C</addressOffset>
-        </register>
+        <cluster>
+          <dim>32</dim>
+          <dimIncrement>0x04</dimIncrement>
+          <addressOffset>0x80</addressOffset>
+          <name>CHANNEL[%s]</name>
+          <description>Channel configuration register</description>
+          <register>
+            <name>TOPCMP</name>
+            <description>Channel counter full word access alias</description>
+            <addressOffset>0x0</addressOffset>
+            <fields>
+              <field>
+                <name>CMP</name>
+                <bitRange>[15:0]</bitRange>
+                <description>Channel counter compare value</description>
+              </field>
+              <field>
+                <name>TOP</name>
+                <bitRange>[31:16]</bitRange>
+                <description>Channel counter top/wrap value</description>
+              </field>
+            </fields>
+          </register>
+        </cluster>
       </registers>
     </peripheral>
 
-    <!-- GPTMR -->
+    <!-- **************************************************************** -->
+    <!-- GPTMR                                                            -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>GPTMR</name>
@@ -550,55 +502,67 @@
 
       <addressBlock>
         <offset>0</offset>
-        <size>0x10</size>
+        <size>0x100</size>
         <usage>registers</usage>
       </addressBlock>
 
       <registers>
         <register>
-          <name>CTRL</name>
-          <description>Control register</description>
+          <name>CSR0</name>
+          <description>Control and status register 0</description>
           <addressOffset>0x00</addressOffset>
           <fields>
             <field>
-              <name>GPTMR_CTRL_EN</name>
-              <bitRange>[0:0]</bitRange>
-              <description>Timer enable flag</description>
+              <name>ENABLE</name>
+              <bitRange>[15:0]</bitRange>
+              <description>Per-slice enable bit</description>
             </field>
             <field>
-              <name>GPTMR_CTRL_PRSC</name>
-              <bitRange>[3:1]</bitRange>
-              <description>Clock prescaler select</description>
-            </field>
-            <field>
-              <name>GPTMR_CTRL_IRQ_CLR</name>
-              <bitRange>[30:30]</bitRange>
-              <access>write-only</access>
-              <description>Set to clear timer-match interrupt</description>
-            </field>
-            <field>
-              <name>GPTMR_CTRL_IRQ_PND</name>
-              <bitRange>[31:31]</bitRange>
-              <access>read-only</access>
-              <description>Timer-match interrupt pending</description>
+              <name>MODE</name>
+              <bitRange>[31:16]</bitRange>
+              <description>Per-slice mode bit (0 = single-shot mode, 1 = continuous mode)</description>
             </field>
           </fields>
         </register>
         <register>
-          <name>THRES</name>
-          <description>Threshold register</description>
+          <name>CSR1</name>
+          <description>Control and status register 1</description>
           <addressOffset>0x04</addressOffset>
+          <fields>
+            <field>
+              <name>IRQ</name>
+              <bitRange>[15:0]</bitRange>
+              <description>Per-slice interrupt-pending bit; write 0 to clear</description>
+            </field>
+            <field>
+              <name>PRSC</name>
+              <bitRange>[18:16]</bitRange>
+              <description>Global clock prescaler select</description>
+            </field>
+          </fields>
         </register>
-        <register>
-          <name>COUNT</name>
-          <description>Counter register</description>
-          <addressOffset>0x08</addressOffset>
-          <access>read-only</access>
-        </register>
+        <cluster>
+          <dim>16</dim>
+          <dimIncrement>0x08</dimIncrement>
+          <addressOffset>0x80</addressOffset>
+          <name>SLICE[%s]</name>
+          <description>Timer slice</description>
+          <register>
+            <name>CNT</name>
+            <description>Counter register</description>
+            <addressOffset>0x00</addressOffset>
+          </register>
+          <register>
+            <name>THR</name>
+            <description>Threshold register</description>
+            <addressOffset>0x04</addressOffset>
+          </register>
+        </cluster>
       </registers>
     </peripheral>
 
-    <!-- ONEWIRE -->
+    <!-- **************************************************************** -->
+    <!-- ONEWIRE                                                          -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>ONEWIRE</name>
@@ -700,7 +664,8 @@
       </registers>
     </peripheral>
 
-    <!-- CLINT -->
+    <!-- **************************************************************** -->
+    <!-- CLINT                                                            -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>CLINT</name>
@@ -742,7 +707,8 @@
       </registers>
     </peripheral>
 
-    <!-- UART0 -->
+    <!-- **************************************************************** -->
+    <!-- UART0                                                            -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>UART0</name>
@@ -836,7 +802,8 @@
               <name>UART_CTRL_RX_OVER</name>
               <bitRange>[30:30]</bitRange>
               <access>read-only</access>
-              <description>RX FIFO overflow</description>
+              <readAction>modify</readAction>
+              <description>RX FIFO overflow; clears on CTRL read access</description>
             </field>
             <field>
               <name>UART_CTRL_TX_BUSY</name>
@@ -851,11 +818,31 @@
           <description>RTX data register</description>
           <addressOffset>0x04</addressOffset>
           <readAction>modify</readAction>
+          <fields>
+            <field>
+              <name>UART_DATA_RTX</name>
+              <bitRange>[7:0]</bitRange>
+              <description>Receive/transmit data</description>
+            </field>
+            <field>
+              <name>UART_DATA_RX_FIFO</name>
+              <bitRange>[11:8]</bitRange>
+              <access>read-only</access>
+              <description>log2(RX FIFO size)</description>
+            </field>
+            <field>
+              <name>UART_DATA_TX_FIFO</name>
+              <bitRange>[15:12]</bitRange>
+              <access>read-only</access>
+              <description>log2(TX FIFO size)</description>
+            </field>
+          </fields>
         </register>
       </registers>
     </peripheral>
 
-    <!-- UART1 -->
+    <!-- **************************************************************** -->
+    <!-- UART1                                                            -->
     <!-- **************************************************************** -->
     <peripheral derivedFrom="UART0">
       <name>UART1</name>
@@ -871,7 +858,8 @@
       </addressBlock>
     </peripheral>
 
-    <!-- SPI -->
+    <!-- **************************************************************** -->
+    <!-- SPI                                                              -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>SPI</name>
@@ -977,7 +965,8 @@
       </registers>
     </peripheral>
 
-    <!-- TWI -->
+    <!-- **************************************************************** -->
+    <!-- TWI                                                              -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>TWI</name>
@@ -1082,14 +1071,15 @@
       </registers>
     </peripheral>
 
-    <!-- TWD -->
+    <!-- **************************************************************** -->
+    <!-- TWD                                                              -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>TWD</name>
       <description>Two-wire device controller</description>
       <baseAddress>0xFFEA0000</baseAddress>
 
-      <interrupt><name>TWD_FIRQ</name><value>0</value></interrupt>
+      <interrupt><name>TWD_FIRQ</name><value>4</value></interrupt>
 
       <addressBlock>
         <offset>0</offset>
@@ -1146,14 +1136,29 @@
               <description>IRQ if TX FIFO empty</description>
             </field>
             <field>
+              <name>TWD_CTRL_IRQ_TX_NFULL</name>
+              <bitRange>[14:14]</bitRange>
+              <description>IRQ if TX FIFO is not full</description>
+            </field>
+            <field>
+              <name>TWD_CTRL_IRQ_COM_BEG</name>
+              <bitRange>[15:15]</bitRange>
+              <description>IRQ if begin of communication</description>
+            </field>
+            <field>
+              <name>TWD_CTRL_IRQ_COM_END</name>
+              <bitRange>[16:16]</bitRange>
+              <description>IRQ if end of communication</description>
+            </field>
+            <field>
               <name>TWD_CTRL_RX_FIFO</name>
-              <bitRange>[19:16]</bitRange>
+              <bitRange>[20:17]</bitRange>
               <access>read-only</access>
               <description>log2(TWD RX FIFO size)</description>
             </field>
             <field>
               <name>TWD_CTRL_TX_FIFO</name>
-              <bitRange>[23:20]</bitRange>
+              <bitRange>[24:21]</bitRange>
               <access>read-only</access>
               <description>log2(TWD TX FIFO size)</description>
             </field>
@@ -1182,22 +1187,20 @@
               <description>TX FIFO full</description>
             </field>
             <field>
-              <name>TWD_CTRL_SENSE_SCL</name>
+              <name>TWD_CTRL_COM_BEG</name>
               <bitRange>[29:29]</bitRange>
-              <access>read-only</access>
-              <description>current state of the SCL bus line</description>
+              <description>communication has started; clear by writing 1</description>
             </field>
             <field>
-              <name>TWD_CTRL_SENSE_SDA</name>
+              <name>TWD_CTRL_COM_END</name>
               <bitRange>[30:30]</bitRange>
-              <access>read-only</access>
-              <description>current state of the SDA bus line</description>
+              <description>communication has ended; clear by writing 1</description>
             </field>
             <field>
-              <name>TWD_CTRL_BUSY</name>
+              <name>TWD_CTRL_COM</name>
               <bitRange>[31:31]</bitRange>
               <access>read-only</access>
-              <description>bus engine is busy (transaction in progress)</description>
+              <description>active communication</description>
             </field>
           </fields>
         </register>
@@ -1217,7 +1220,8 @@
       </registers>
     </peripheral>
 
-    <!-- TRNG -->
+    <!-- **************************************************************** -->
+    <!-- TRNG                                                             -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>TRNG</name>
@@ -1250,22 +1254,40 @@
               <description>Clear data FIFO when set (flag auto clears)</description>
             </field>
             <field>
-              <name>TRNG_CTRL_FIFO_SIZE</name>
-              <bitRange>[5:2]</bitRange>
-              <access>read-only</access>
-              <description>log2(TRNG FIFO size)</description>
-            </field>
-            <field>
               <name>TRNG_CTRL_SIM_MODE</name>
-              <bitRange>[6:6]</bitRange>
+              <bitRange>[2:2]</bitRange>
               <access>read-only</access>
               <description>TRNG simulation mode (PRNG!) active</description>
             </field>
             <field>
               <name>TRNG_CTRL_AVAIL</name>
-              <bitRange>[7:7]</bitRange>
+              <bitRange>[3:3]</bitRange>
               <access>read-only</access>
               <description>Random data available</description>
+            </field>
+            <field>
+              <name>TRNG_CTRL_FIFO</name>
+              <bitRange>[7:4]</bitRange>
+              <access>read-only</access>
+              <description>log2(TRNG FIFO depth)</description>
+            </field>
+            <field>
+              <name>TRNG_CTRL_NBIT</name>
+              <bitRange>[11:8]</bitRange>
+              <access>read-only</access>
+              <description>log2(number of raw bits) processed for one output byte</description>
+            </field>
+            <field>
+              <name>TRNG_CTRL_NRO</name>
+              <bitRange>[19:12]</bitRange>
+              <access>read-only</access>
+              <description>Total number of ring-oscillators</description>
+            </field>
+            <field>
+              <name>TRNG_CTRL_NINV</name>
+              <bitRange>[31:20]</bitRange>
+              <access>read-only</access>
+              <description>Number of inverters in first ring-oscillator</description>
             </field>
           </fields>
         </register>
@@ -1273,6 +1295,7 @@
           <name>DATA</name>
           <description>Random data</description>
           <addressOffset>0x04</addressOffset>
+          <access>read-only</access>
           <readAction>modify</readAction>
           <fields>
             <field>
@@ -1286,7 +1309,8 @@
       </registers>
     </peripheral>
 
-    <!-- WDT -->
+    <!-- **************************************************************** -->
+    <!-- WDT                                                              -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>WDT</name>
@@ -1344,7 +1368,8 @@
       </registers>
     </peripheral>
 
-    <!-- GPIO -->
+    <!-- **************************************************************** -->
+    <!-- GPIO                                                             -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>GPIO</name>
@@ -1372,6 +1397,11 @@
           <addressOffset>0x04</addressOffset>
         </register>
         <register>
+          <name>PORT_DIR</name>
+          <description>Port direction configuration: 0 = input, 1 = output</description>
+          <addressOffset>0x08</addressOffset>
+        </register>
+        <register>
           <name>IRQ_TYPE</name>
           <description>Interrupt trigger type (level/edge) for each input pin</description>
           <addressOffset>0x10</addressOffset>
@@ -1394,7 +1424,8 @@
       </registers>
     </peripheral>
 
-    <!-- NEOLED -->
+    <!-- **************************************************************** -->
+    <!-- NEOLED                                                           -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>NEOLED</name>
@@ -1487,7 +1518,8 @@
       </registers>
     </peripheral>
 
-    <!-- TRACER -->
+    <!-- **************************************************************** -->
+    <!-- TRACER                                                           -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>TRACER</name>
@@ -1577,7 +1609,107 @@
       </registers>
     </peripheral>
 
-    <!-- SYSINFO -->
+    <!-- **************************************************************** -->
+    <!-- SMC                                                             -->
+    <!-- **************************************************************** -->
+    <peripheral>
+      <name>SMC</name>
+      <description>Serial Memory Controller</description>
+      <baseAddress>0xFFEF0000</baseAddress>
+
+      <addressBlock>
+        <offset>0</offset>
+        <size>0x08</size>
+        <usage>registers</usage>
+      </addressBlock>
+
+      <registers>
+        <register>
+          <name>CSR0</name>
+          <description>Control and status register 0</description>
+          <addressOffset>0x00</addressOffset>
+          <fields>
+            <field>
+              <name>SMC_CSR0_EN</name>
+              <bitRange>[0:0]</bitRange>
+              <description>SMC enable, reset module when 0</description>
+            </field>
+            <field>
+              <name>SMC_CSR0_IOEN</name>
+              <bitRange>[1:1]</bitRange>
+              <description>Enable control of SMC IO pins</description>
+            </field>
+            <field>
+              <name>SMC_CSR0_DUAL</name>
+              <bitRange>[3:3]</bitRange>
+              <description>Enable dual-chip mode</description>
+            </field>
+            <field>
+              <name>SMC_CSR0_BUSY</name>
+              <bitRange>[4:4]</bitRange>
+              <access>read-only</access>
+              <description>Memory operation in progress when set</description>
+            </field>
+            <field>
+              <name>SMC_CSR0_MSIZE</name>
+              <bitRange>[8:7]</bitRange>
+              <description>Memory size select</description>
+            </field>
+            <field>
+              <name>SMC_CSR0_CDIV</name>
+              <bitRange>[11:9]</bitRange>
+              <description>SPI clock divider</description>
+            </field>
+            <field>
+              <name>SMC_CSR0_RWAIT</name>
+              <bitRange>[15:12]</bitRange>
+              <description>Memory read access dummy/wait cycles</description>
+            </field>
+            <field>
+              <name>SMC_CSR0_RCMD</name>
+              <bitRange>[23:16]</bitRange>
+              <description>Memory read command</description>
+            </field>
+            <field>
+              <name>SMC_CSR0_WCMD</name>
+              <bitRange>[31:24]</bitRange>
+              <description>Memory write command</description>
+            </field>
+          </fields>
+        </register>
+        <register>
+          <name>CSR1</name>
+          <description>Control and status register 0</description>
+          <addressOffset>0x04</addressOffset>
+          <fields>
+            <field>
+              <name>SMC_CSR1_ICMD0</name>
+              <bitRange>[7:0]</bitRange>
+              <description>Initialization command 0</description>
+            </field>
+            <field>
+              <name>SMC_CSR1_ICMD1</name>
+              <bitRange>[15:8]</bitRange>
+              <description>Initialization command 1</description>
+            </field>
+            <field>
+              <name>SMC_CSR1_ICMD2</name>
+              <bitRange>[23:16]</bitRange>
+              <description>Initialization command 2</description>
+            </field>
+            <field>
+              <name>SMC_CSR1_MEM_BASE</name>
+              <bitRange>[31:28]</bitRange>
+              <access>read-only</access>
+              <description>Memory base address (top 4 bits / 256MB page)</description>
+            </field>
+          </fields>
+        </register>
+      </registers>
+    </peripheral>
+
+    <!-- **************************************************************** -->
+    <!-- SYSINFO                                                          -->
     <!-- **************************************************************** -->
     <peripheral>
       <name>SYSINFO</name>
@@ -1597,7 +1729,7 @@
           <addressOffset>0x00</addressOffset>
         </register>
         <register>
-          <name>MEM</name>
+          <name>MISC</name>
           <description>Miscellaneous system configurations</description>
           <addressOffset>0x04</addressOffset>
           <access>read-only</access>
@@ -1623,6 +1755,7 @@
             <field><name>SYSINFO_SOC_OCD</name><bitRange>[4:4]</bitRange><description>On-chip debugger implemented</description></field>
             <field><name>SYSINFO_SOC_ICACHE</name><bitRange>[5:5]</bitRange><description>Processor-internal instruction cache implemented</description></field>
             <field><name>SYSINFO_SOC_DCACHE</name><bitRange>[6:6]</bitRange><description>Processor-internal data cache implemented</description></field>
+            <field><name>SYSINFO_SOC_SCM</name><bitRange>[7:7]</bitRange><description>Serial memory controller implemented</description></field>
             <field><name>SYSINFO_SOC_OCD_AUTH</name><bitRange>[11:11]</bitRange><description>On-chip debugger authentication implemented</description></field>
             <field><name>SYSINFO_SOC_IMEM_ROM</name><bitRange>[12:12]</bitRange><description>Processor-internal instruction memory implemented as pre-initialized ROM</description></field>
             <field><name>SYSINFO_SOC_IO_TWD</name><bitRange>[13:13]</bitRange><description>Two-wire device implemented</description></field>
@@ -1643,6 +1776,7 @@
             <field><name>SYSINFO_SOC_IO_GPTMR</name><bitRange>[28:28]</bitRange><description>General purpose timer implemented</description></field>
             <field><name>SYSINFO_SOC_IO_SLINK</name><bitRange>[29:29]</bitRange><description>Stream link interface implemented</description></field>
             <field><name>SYSINFO_SOC_IO_ONEWIRE</name><bitRange>[30:30]</bitRange><description>1-wire interface controller implemented</description></field>
+            <field><name>SYSINFO_SOC_SIM</name><bitRange>[31:31]</bitRange><description>Set if this is a simulation</description></field>
           </fields>
         </register>
         <register>
@@ -1651,12 +1785,11 @@
           <addressOffset>0x0C</addressOffset>
           <access>read-only</access>
           <fields>
-            <field><name>SYSINFO_CACHE_INST_BLOCK_SIZE</name><bitRange>[3:0]</bitRange><description>i-cache: log2(Block size in bytes)</description></field>
-            <field><name>SYSINFO_CACHE_INST_NUM_BLOCKS</name><bitRange>[7:4]</bitRange><description>i-cache: log2(Number of cache blocks)</description></field>
-            <field><name>SYSINFO_CACHE_DATA_BLOCK_SIZE</name><bitRange>[11:8]</bitRange><description>d-cache: log2(Block size in bytes)</description></field>
-            <field><name>SYSINFO_CACHE_DATA_NUM_BLOCKS</name><bitRange>[15:12]</bitRange><description>d-cache: log2(Number of cache blocks)</description></field>
-            <field><name>SYSINFO_CACHE_INST_BURSTS_EN</name><bitRange>[16:16]</bitRange><description>i-cache: burst transfers enabled</description></field>
-            <field><name>SYSINFO_CACHE_DATA_BURSTS_EN</name><bitRange>[24:24]</bitRange><description>d-cache: burst transfers enabled</description></field>
+            <field><name>SYSINFO_CACHE_BLOCK_SIZE</name><bitRange>[3:0]</bitRange><description>log2(Block size in bytes)</description></field>
+            <field><name>SYSINFO_CACHE_I_NUM_BLOCKS</name><bitRange>[7:4]</bitRange><description>log2(Number of i-cache blocks)</description></field>
+            <field><name>SYSINFO_CACHE_D_NUM_BLOCKS</name><bitRange>[11:8]</bitRange><description>log2(Number of d-cache blocks)</description></field>
+            <field><name>YSINFO_CACHE_UC_BEGIN</name><bitRange>[15:12]</bitRange><description>start of uncache address space (256MB page)</description></field>
+            <field><name>SYSINFO_CACHE_BURSTS_EN</name><bitRange>[16:16]</bitRange><description>burst transfers enabled</description></field>
           </fields>
         </register>
       </registers>

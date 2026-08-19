@@ -1,5 +1,5 @@
 -- ****************************************************************************
--- *  Copyright (c) 2021 by Michael Fischer (www.emb4fun.de)
+-- *  Copyright (c) 2021-2026 by Michael Fischer (www.emb4fun.de)
 -- *  All rights reserved.
 -- *
 -- *  Redistribution and use in source and binary forms, with or without 
@@ -89,6 +89,7 @@ architecture syn of wb_sdram is
    --
    -- SDRAM Controller from nullobject with modification for "byteenable".
    -- The original project can be find here: https://github.com/nullobject/sdram-fpga
+   -- Fork with mask support: https://github.com/emb4fun/sdram-fpga
    --
    component sdram is
       generic (
@@ -184,8 +185,6 @@ architecture syn of wb_sdram is
    signal write_sig      : std_logic;
    signal read_ack       : std_logic;
    signal write_ack      : std_logic;
-   signal read_wait_cnt  : integer range 0 to 8;
-   signal write_wait_cnt : integer range 0 to 8;
 
    signal sdram_we       : std_logic;
    signal sdram_mask     : std_logic_vector(3 downto 0);
@@ -205,15 +204,15 @@ architecture syn of wb_sdram is
    --
    -- FSM defines
    --
-   type   fsm_state_t is (STATE_IDLE, STATE_WRITE_1, STATE_WRITE_2, STATE_READ_1, STATE_READ_2, STATE_READ_3, STATE_DONE);
+   type   fsm_state_t is (STATE_IDLE, STATE_WRITE_1, STATE_WRITE_2, STATE_READ_1, STATE_READ_2, STATE_READ_3);
    signal fsm_state   : fsm_state_t := STATE_IDLE;
 
    
 begin
 
-   -- Convert wishbone signals             
-   read_sig  <= '1' when (wbs_cyc_i = '1' and wbs_we_i = '0') else '0';
-   write_sig <= '1' when (wbs_cyc_i = '1' and wbs_we_i = '1') else '0';
+   -- Convert wishbone signals (valid cycle requires cyc and stb)
+   read_sig  <= '1' when (wbs_cyc_i = '1' and wbs_stb_i = '1' and wbs_we_i = '0') else '0';
+   write_sig <= '1' when (wbs_cyc_i = '1' and wbs_stb_i = '1' and wbs_we_i = '1') else '0';
 
 
    --
@@ -412,7 +411,7 @@ begin
             -- 
             when STATE_READ_3 =>
                read_ack  <= '0';
-               fsm_state <= STATE_DONE;
+               fsm_state <= STATE_IDLE;
             -- STATE_WRITE_3
 
 
@@ -433,7 +432,7 @@ begin
    -- Output
    --------------------------------------------------------
    
-   wbs_ack_o <= '1' when ((wbs_cyc_i = '1') and ((read_ack = '1' or write_ack = '1'))) else '0';
+   wbs_ack_o <= read_ack or write_ack;
 
 end architecture syn;
 

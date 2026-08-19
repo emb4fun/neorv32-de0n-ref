@@ -25,6 +25,66 @@ component_test_cmake_shared () {
     $FRAMEWORK/tests/programs/dlopen_demo.sh
 }
 
+component_build_make_no_gen_files () {
+    msg "prepare for building in a minimal environment"
+
+    # Ensure that the generated files are present (should be a no-op
+    # since the all.sh infrastructure already does it).
+    make generated_files
+
+    # Arrange for the non-generated sources to be more recent than any
+    # generated file. This allows us to detect if the makefile tries
+    # to rebuild the generated files from their dependencies when it
+    # shouldn't.
+    # Wait 1 second so this test is effective even if the filesystem
+    # only has a granularity of 1 second for timestamps.
+    sleep 1
+    git ls-files -z | xargs -0 touch --
+
+    # The setup code of all.sh sets up a "quiet" wrapper for `make`.
+    # We want to bypass it and just use the normal make program,
+    # so that this test mimics a normal user's platform.
+    # And anyway we need to bypass it because it wouldn't work without bash
+    # and other tools in the $PATH.
+    # The wrapper is used because the setup code adds the
+    # `.../framework/scripts/quiet` directlry to the beginning of the $PATH.
+    # So here we remove that.
+    shopt -s extglob
+    # Strip off all entries in $PATH that ends with `/quiet`. (This misses
+    # the very last element, but we know we'll never need to remove the last
+    # element, since we just want to remove the wrapper directory that comes
+    # before the normal programs.)
+    PATH=${PATH//*([!:])\/quiet:/}
+
+    # Locate the minimum programs needed for the build: ${CC} and ${AR}.
+    AR="$(command -v ar)"
+    # GCC needs "as" in $PATH by default. To use GCC, we need to tell it where
+    # to find the assembler. Or we can use clang which just works.
+    CC="$(command -v clang)"
+    # For cleaning.
+    RM="$(command -v rm)"
+
+    # Test the build with make.
+    # Preferably we should also test with CMake. Note that a CMake test
+    # would be harder to set up, because CMake will find e.g. /usr/bin/python
+    # even if it isn't on $PATH.
+    msg "build: make lib with GEN_FILES off in minimal environment"
+    env PATH=/no/such/directory "$(command -v make)" GEN_FILES= AR="$AR" CC="$CC" lib
+
+    msg "build: make -C library clean with GEN_FILES off in minimal environment"
+    env PATH=/no/such/directory "$(command -v make)" GEN_FILES= RM="$RM" -C library clean
+
+    msg "build: make lib with GEN_FILES off with generated files missing"
+    make neat
+    # Check that a sample generated file is absent
+    not test -f library/error.c
+    PERL="$(command -v perl)"
+    PYTHON="$(command -v python3)"
+    # We take whatever Python environment we're in. For a future improvement,
+    # make a venv with just scripts/basic.requirements.txt.
+    env PATH=/no/such/directory "$(command -v make)" GEN_FILES= AR="$AR" CC="$CC" PERL="$PERL" PYTHON="$PYTHON" lib
+}
+
 support_test_cmake_out_of_source () {
     distrib_id=""
     distrib_ver=""
@@ -140,6 +200,60 @@ component_test_cmake_as_package_install () {
 }
 
 support_test_cmake_as_package_install () {
+    support_test_cmake_out_of_source
+}
+
+component_test_cmake_install_with_destdir () {
+    # Remove existing generated files so that we use the ones CMake
+    # generates
+    $MAKE_COMMAND neat
+
+    msg "install: cmake with DESTDIR staging"
+    MBEDTLS_ROOT_DIR="$PWD"
+    mkdir "$OUT_OF_SOURCE_DIR"
+    cd "$OUT_OF_SOURCE_DIR"
+    cmake -DGEN_FILES=ON -DENABLE_PROGRAMS=OFF -DENABLE_TESTING=OFF -DUSE_SHARED_MBEDTLS_LIBRARY=ON -DCMAKE_INSTALL_PREFIX:PATH=/usr "$MBEDTLS_ROOT_DIR"
+    make
+
+    DESTDIR="$OUT_OF_SOURCE_DIR/stage" make install
+
+    install_lib_subdir="$(sed -n 's/^CMAKE_INSTALL_LIBDIR:PATH=//p' CMakeCache.txt)"
+    [ -n "$install_lib_subdir" ] # Failed to read CMAKE_INSTALL_LIBDIR from CMakeCache.txt
+
+    install_lib_path="$OUT_OF_SOURCE_DIR/stage/usr/${install_lib_subdir}"
+
+    if [[ "$OSTYPE" == darwin* ]]; then
+        # On macOS the custom install logic installs libmbedcrypto.dylib
+        # directly without a versioned symlink chain.
+        for lib in mbedcrypto mbedx509 mbedtls; do
+            [ -f "$install_lib_path/lib${lib}.a" ]
+            [ -e "$install_lib_path/lib${lib}.dylib" ]
+        done
+    else
+        # library/CMakeLists.txt installs libmbedcrypto.so with a versioned
+        # symlink chain on Linux.
+        for lib in mbedcrypto mbedx509 mbedtls; do
+            if [ "$QUIET" -eq 0 ]; then
+                echo "Checking lib=$lib"
+            fi
+            [ -f "$install_lib_path/lib${lib}.a" ]
+            [ -L "$install_lib_path/lib${lib}.so" ]
+            [ -e "$install_lib_path/lib${lib}.so" ]
+
+            # Match ABI-version names such as libxxx.so.17
+            # and check that symlink.
+            versioned=( "$install_lib_path/lib${lib}.so".+([0-9]) )
+            if [ "$QUIET" -eq 0 ]; then
+                declare -p versioned
+            fi
+            [ "${#versioned[@]}" -eq 1 ]
+            [ -L "${versioned[0]}" ]
+            [ -e "${versioned[0]}" ]
+        done
+    fi
+}
+
+support_test_cmake_install_with_destdir () {
     support_test_cmake_out_of_source
 }
 

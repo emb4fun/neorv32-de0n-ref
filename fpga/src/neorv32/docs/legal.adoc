@@ -10,14 +10,15 @@
 **The NEORV32 RISC-V Processor** +
 https://github.com/stnolting/neorv32 +
 Stephan Nolting, M.Sc. +
-🇪🇺 European Union +
-stnolting@gmail.com
+stnolting[ät]gmail[dot]com +
+European Union, Germany
 ==========================
 
-.DOI
-[NOTE]
-This project provides a _digital object identifier_ provided by https://zenodo.org[zenodo]:
-https://doi.org/10.5281/zenodo.5018888[image:https://zenodo.org/badge/DOI/10.5281/zenodo.5018888.svg[title='zenodo']]
+:sectnums!:
+=== DOI
+
+This project provides a _digital object identifier (DOI)_ provided by https://zenodo.org[zenodo]:
+https://doi.org/10.5281/zenodo.5018888
 
 
 // ####################################################################################################################
@@ -26,8 +27,8 @@ https://doi.org/10.5281/zenodo.5018888[image:https://zenodo.org/badge/DOI/10.528
 
 **BSD 3-Clause License**
 
-Copyright (c) NEORV32 contributors.
-Copyright (c) 2020 - 2025, Stephan Nolting. All rights reserved.
+Copyright (c) NEORV32 contributors. +
+Copyright (c) 2020 - 2026, Stephan Nolting. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that
 the following conditions are met:

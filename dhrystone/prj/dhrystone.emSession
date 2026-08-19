@@ -1,11 +1,15 @@
 <!DOCTYPE CrossStudio_Session_File>
 <session>
  <Bookmarks/>
- <Breakpoints groups="Breakpoints" active_group="Breakpoints"/>
+ <Breakpoints groups="Breakpoints" active_group="Breakpoints">
+  <Exceptions>
+   <Group group="" set=""/>
+  </Exceptions>
+ </Breakpoints>
  <ExecutionProfileWindow/>
  <FrameBuffer>
-  <FrameBufferWindow width="0" keepAspectRatio="0" zoomToFitWindow="0" showGrid="0" addressSpace="" format="0" height="0" autoEvaluate="0" scaleFactor="1" refreshPeriod="0" name="dhrystone_TCM Release" addressText="" accessByDisplayWidth="0"/>
-  <FrameBufferWindow width="0" keepAspectRatio="0" zoomToFitWindow="0" showGrid="0" addressSpace="" format="0" height="0" autoEvaluate="0" scaleFactor="1" refreshPeriod="0" name="dhrystone_SDRAM Release" addressText="" accessByDisplayWidth="0"/>
+  <FrameBufferWindow width="0" keepAspectRatio="0" flipHorizontally="0" zoomToFitWindow="0" showGrid="0" flipVertically="0" addressSpace="" format="0" height="0" autoEvaluate="0" rotationDegrees="0" scaleFactor="1" refreshPeriod="0" name="dhrystone_TCM Release" addressText="" accessByDisplayWidth="0"/>
+  <FrameBufferWindow width="0" keepAspectRatio="0" flipHorizontally="0" zoomToFitWindow="0" showGrid="0" flipVertically="0" addressSpace="" format="0" height="0" autoEvaluate="0" rotationDegrees="0" scaleFactor="1" refreshPeriod="0" name="dhrystone_SDRAM Release" addressText="" accessByDisplayWidth="0"/>
  </FrameBuffer>
  <Memory1>
   <MemoryWindow addressSpace="" dataSize="1" autoEvaluate="0" viewMode="0" viewType="4" addressOrder="0" columnsText="" refreshPeriod="0" name="dhrystone_TCM Release" sizeText="" addressText=""/>

@@ -3,7 +3,7 @@
 -- -------------------------------------------------------------------------------- --
 -- The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              --
 -- Copyright (c) NEORV32 contributors.                                              --
--- Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  --
+-- Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  --
 -- Licensed under the BSD-3-Clause license, see LICENSE for details.                --
 -- SPDX-License-Identifier: BSD-3-Clause                                            --
 -- ================================================================================ --
@@ -12,12 +12,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.math_real.all;
-
--- pragma translate_off
--- RTL_SYNTHESIS OFF
 use std.textio.all;
--- RTL_SYNTHESIS ON
--- pragma translate_on
 
 entity sim_uart_rx is
   generic (
@@ -29,7 +24,7 @@ entity sim_uart_rx is
     clk : in std_ulogic; -- global clock
     rxd : in std_ulogic -- serial UART RX data
   );
-end entity sim_uart_rx;
+end entity;
 
 architecture sim_uart_rx_rtl of sim_uart_rx is
 
@@ -42,8 +37,6 @@ architecture sim_uart_rx_rtl of sim_uart_rx is
 
 begin
 
--- pragma translate_off
--- RTL_SYNTHESIS OFF
   sim_receiver: process(clk)
     file file_out   : text open write_mode is NAME & ".log";
     variable char_v : integer;
@@ -88,8 +81,6 @@ begin
         baudcnt <= baudcnt - 1.0;
       end if;
     end if;
-  end process sim_receiver;
--- RTL_SYNTHESIS ON
--- pragma translate_on
+  end process;
 
-end architecture sim_uart_rx_rtl;
+end architecture;

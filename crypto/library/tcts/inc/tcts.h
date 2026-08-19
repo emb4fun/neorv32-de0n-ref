@@ -1,7 +1,7 @@
 /**************************************************************************
 *  This file is part of the TCTS project (Tiny Cooperative Task Scheduler)
 *
-*  Copyright (c) 2014-2024 by Michael Fischer (www.emb4fun.de).
+*  Copyright (c) 2014-2026 by Michael Fischer (www.emb4fun.de).
 *  All rights reserved.
 *
 *  Redistribution and use in source and binary forms, with or without
@@ -72,6 +72,17 @@
 *  25.02.2021  mifi  Change version to v0.21.0.
 *                    Added OS_TaskWakeup and OS_TaskIsSleeping.
 *  16.05.2021  mifi  Change version to v0.22.0.
+*  08.06.2026  mifi  Fix OS_MutexSignal handoff to waiting task.
+*                    Version was changed to v0.23.0 in the past because
+*                    of the new Message queue functionality:
+*                    - OS_MQCreate
+*                    - OS_MQPost
+*                    - OS_MQPostFromInt
+*                    - OS_MQWait
+*                    - OS_MQGroupCreate
+*                    - OS_MQGroupJoin
+*                    - OS_MQGroupLeave
+*                    - OS_MQGroupWait
 **************************************************************************/
 #if !defined(__TCTS_H__)
 #define __TCTS_H__
@@ -101,7 +112,7 @@
  * OS version information
  */
 #define OS_VER_MAJOR          0
-#define OS_VER_MINOR          22
+#define OS_VER_MINOR          23
 #define OS_VER_PATCH          0
 
 #define OS_VER_NUMBER         ((OS_VER_MAJOR << 24) | (OS_VER_MINOR << 16) | (OS_VER_PATCH << 8))
@@ -148,6 +159,8 @@ typedef struct _os_mutex_     OS_MUTEX;
 typedef struct _os_event_     OS_EVENT;
 typedef struct _os_mbox_      OS_MBOX;
 typedef struct _os_mq_        OS_MQ;
+
+typedef struct _os_mbox_      OS_MQ_GROUP;
 
 
 /*
@@ -233,14 +246,15 @@ struct _os_mbox_
  */
 struct _os_mq_
 {
-   OS_SEMA      UsedCntSema;
-   OS_SEMA      FreeCntSema;
-   uint16_t    wCountMax;
-   uint16_t    wCount;
-   uint16_t    wSize;
-   uint16_t    wInIndex;
-   uint16_t    wOutIndex;
-   uint8_t    *pBuffer;
+   OS_SEMA            UsedCntSema;
+   OS_SEMA            FreeCntSema;
+   uint16_t          wCountMax;
+   uint16_t          wCount;
+   uint16_t          wSize;
+   uint16_t          wInIndex;
+   uint16_t          wOutIndex;
+   uint8_t          *pBuffer;
+   struct _os_mbox_ *pMboxGroup;
 };
 
 
@@ -470,6 +484,10 @@ int       OS_MQPost (OS_MQ *pMQ, void *pMsg);
 int       OS_MQPostFromInt (OS_MQ *pMQ, void *pMsg);
 int       OS_MQWait (OS_MQ *pMQ, void *pMsg, uint32_t dTimeoutMs);
 
+void      OS_MQGroupCreate (OS_MQ_GROUP *pMQgroup, OS_MQ **pBuffer, uint16_t wCounterMax);
+int       OS_MQGroupJoin (OS_MQ *pMQ, OS_MQ_GROUP *pGroup);
+int       OS_MQGroupLeave (OS_MQ *pMQ);
+int       OS_MQGroupWait (OS_MQ_GROUP *pGroup, OS_MQ **pMQ, uint32_t dTimeoutMs);
 
 #endif /* defined(RTOS_TCTS) */
 

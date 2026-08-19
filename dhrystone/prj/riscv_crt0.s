@@ -3,8 +3,8 @@
 // *                        The Embedded Experts                        *
 // **********************************************************************
 // *                                                                    *
-// *            (c) 2014 - 2021 SEGGER Microcontroller GmbH             *
-// *            (c) 2001 - 2021 Rowley Associates Limited               *
+// *            (c) 2014 - 2025 SEGGER Microcontroller GmbH             *
+// *            (c) 2001 - 2025 Rowley Associates Limited               *
 // *                                                                    *
 // *           www.segger.com     Support: support@segger.com           *
 // *                                                                    *
@@ -55,9 +55,8 @@ _start:
   la a0, _ITB_BASE_
   csrrw x0, uitb, a0
 #endif
-  //la sp, __stack_end__
-  lui t0, %hi(__stack_end__)
-  addi sp, t0, %lo(__stack_end__)
+  la t0, __stack_end__
+  mv sp, t0
   la tp, __tbss_start__
   la a0, trap_entry
   csrw mtvec, a0
@@ -168,8 +167,13 @@ _start:
   la a0, __heap_start__
   la a1, __heap_end__
   sub a1, a1, a0
+#if defined(__SES_RISCV)
+  la t1, __SEGGER_RTL_init_heap
+  jalr t1
+#else
   sw zero, 0(a0)  
   sw a1, 4(a0)
+#endif
 1:
 #endif
 
@@ -182,19 +186,26 @@ start:
   la s1, __ctors_end__
 1:
   beq s0, s1, 2f
+#if __riscv_xlen == 64
+  ld t1, 0(s0)
+  addi s0, s0, 8
+#else
   lw t1, 0(s0)
   addi s0, s0, 4
+#endif
   jalr t1
   j 1b
 2:
+
+  .type __startup_complete, function
+__startup_complete:
 
   /* Jump to application entry point */
 #ifdef FULL_LIBRARY
   li a0, ARGSSPACE
   la a1, args
-  la t1, debug_getargs  
+  la t1, SEGGER_SEMIHOST_GetArgs  
   jalr t1
-  li a0, ARGSSPACE
   la a1, args
 #else
   li a0, 0
@@ -202,6 +213,7 @@ start:
 #endif	
   la t1, main
   jalr t1
+  .size _start,.-_start
 
   .global exit
   .type exit, function
@@ -214,19 +226,24 @@ exit:
 1:
   la t0, __dtors_end__
   beq s0, t0, 2f  
+#if __riscv_xlen == 64
+  ld t1, 0(s0)
+  addi s0, s0, 8
+#else
   lw t1, 0(s0)
   addi s0, s0, 4
+#endif
   jalr t1  
   j 1b
 2:
 
   /* Call atexit functions */
-  la t1, _execute_at_exit_fns    
+  la t1, __SEGGER_RTL_execute_at_exit_fns    
   jalr t1
 
-  /* Call debug_exit with return result/exit parameter */
+  /* Call SEGGER_SEMIHOST_Exit with return result/exit parameter */
   mv a0, s1
-  la t1, debug_exit
+  la t1, SEGGER_SEMIHOST_Exit
   jalr t1
 #endif
 
@@ -245,6 +262,7 @@ exit_loop:
   .section .text.trap_entry, "ax", %progbits
   .global trap_entry
   .align 2
+  .type trap_entry, function
 trap_entry:  
   addi sp, sp, -NUM_CALLER_SAVE_REGISTERS*4
   sw ra,  0*4(sp)
@@ -294,6 +312,7 @@ trap_entry:
 
   addi sp, sp, NUM_CALLER_SAVE_REGISTERS*4
   mret
+  .size trap_entry,.-trap_entry
 
   .weak handle_trap
 handle_trap:
@@ -322,58 +341,16 @@ handle_trap:
 .endm
 
 HELPER abort
+#ifdef FULL_LIBRARY
+  li a0, 1
+  la t1, SEGGER_SEMIHOST_Exit
+  jalr t1
+#endif
   j .
 HELPER __assert
   j .
 HELPER __sync_synchronize
   ret
-HELPER __getchar
-  la t0, debug_getchar
-  jr t0
-HELPER __putchar
-  la t0, debug_putchar
-  jr t0
-HELPER __open
-  la t0, debug_fopen
-  jr t0
-HELPER __close
-  la t0, debug_fclose
-  jr t0
-HELPER __read
-  mv a3, a0
-  mv a0, a1
-  li a1, 1  
-  la t0, debug_fread
-  jr t0
-HELPER __write
-  mv a3, a0
-  mv a0, a1
-  li a1, 1  
-  la t0, debug_fwrite
-  jr t0
-HELPER __seek
-  addi sp, sp, -8
-  sw a0, 0*4(sp)
-  sw ra, 1*4(sp)  
-  la t0, debug_fseek
-  jalr t0
-  bnez a0, 1f
-  lw a0, 0*4(sp)
-  la t0, debug_ftell
-  jalr t0
-  j 2f
-1:
-  li a0, -1
-2:
-  lw a4, 0*4(sp)
-  lw ra, 1*4(sp)
-  addi sp, sp, 8
-  ret
-  // char __user_locale_name_buffer[];
-  .section .bss.__user_locale_name_buffer, "aw", %nobits
-  .weak __user_locale_name_buffer
-  __user_locale_name_buffer:
-  .word 0x0
 
 #ifdef FULL_LIBRARY
   .bss

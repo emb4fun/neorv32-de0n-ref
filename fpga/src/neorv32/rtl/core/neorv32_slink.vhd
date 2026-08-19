@@ -3,7 +3,7 @@
 -- -------------------------------------------------------------------------------- --
 -- The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              --
 -- Copyright (c) NEORV32 contributors.                                              --
--- Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  --
+-- Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  --
 -- Licensed under the BSD-3-Clause license, see LICENSE for details.                --
 -- SPDX-License-Identifier: BSD-3-Clause                                            --
 -- ================================================================================ --
@@ -40,7 +40,7 @@ entity neorv32_slink is
     slink_tx_last_o  : out std_ulogic;                     -- end of stream
     slink_tx_ready_i : in  std_ulogic                      -- ready to send
   );
-end neorv32_slink;
+end entity;
 
 architecture neorv32_slink_rtl of neorv32_slink is
 
@@ -71,7 +71,7 @@ architecture neorv32_slink_rtl of neorv32_slink is
   type ctrl_t is record
     enable, irq_rx_nempty, irq_rx_full, irq_tx_empty, irq_tx_nfull : std_ulogic;
   end record;
-  signal ctrl : ctrl_t;
+  signal ctrl : ctrl_t; -- register set
 
   -- routing information --
   signal tx_route, rx_route : std_ulogic_vector(3 downto 0);
@@ -144,7 +144,7 @@ begin
         end if;
       end if;
     end if;
-  end process bus_access;
+  end process;
 
 
   -- RX Data FIFO ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ begin
   rx_fifo.re       <= '1' when (bus_req_i.stb = '1') and (bus_req_i.rw = '0') and (bus_req_i.addr(3) = '1') else '0';
   rx_fifo.we       <= slink_rx_valid_i;
   rx_fifo.wdata    <= slink_rx_last_i & slink_rx_src_i & slink_rx_data_i;
-  slink_rx_ready_o <= rx_fifo.free;
+  slink_rx_ready_o <= rx_fifo.free and ctrl.enable;
 
   -- backup RX attributes for current access --
   rx_attributes: process(rstn_i, clk_i)
@@ -184,13 +184,11 @@ begin
       rx_route <= (others => '0');
     elsif rising_edge(clk_i) then
       if (rx_fifo.re = '1') then
-        rx_last <= rx_fifo.rdata(36);
-      end if;
-      if (rx_fifo.re = '1') then
+        rx_last  <= rx_fifo.rdata(36);
         rx_route <= rx_fifo.rdata(35 downto 32);
       end if;
     end if;
-  end process rx_attributes;
+  end process;
 
 
   -- TX Data FIFO ---------------------------------------------------------------------------
@@ -228,18 +226,15 @@ begin
 
   -- Interrupt Generator --------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  irq_gen: process(rstn_i, clk_i)
+  irq_gen: process(clk_i)
   begin
-    if (rstn_i = '0') then
-      irq_o <= '0';
-    elsif rising_edge(clk_i) then
+    if rising_edge(clk_i) then
       irq_o <= ctrl.enable and (
                (ctrl.irq_rx_nempty and (    rx_fifo.avail)) or -- RX FIFO not empty
                (ctrl.irq_rx_full   and (not rx_fifo.free))  or -- RX FIFO full
                (ctrl.irq_tx_empty  and (not tx_fifo.avail)) or -- TX FIFO empty
                (ctrl.irq_tx_nfull  and (    tx_fifo.free)));   -- TX FIFO not full
     end if;
-  end process irq_gen;
+  end process;
 
-
-end neorv32_slink_rtl;
+end architecture;

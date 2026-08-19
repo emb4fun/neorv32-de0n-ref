@@ -34,6 +34,13 @@
 **************************************************************************/
 #define __TALCPU_COM_C__
 
+/*
+ * Currently, I am still experiencing problems with this module when it
+ * is compiled with excessive optimization. That is why optimization is
+ * disabled here for the time being.
+ */
+#pragma GCC optimize("O0")
+
 /*=======================================================================*/
 /*  Include                                                              */
 /*=======================================================================*/

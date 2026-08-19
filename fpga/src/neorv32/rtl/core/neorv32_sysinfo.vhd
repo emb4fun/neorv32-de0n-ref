@@ -3,7 +3,7 @@
 -- -------------------------------------------------------------------------------- --
 -- The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              --
 -- Copyright (c) NEORV32 contributors.                                              --
--- Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  --
+-- Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  --
 -- Licensed under the BSD-3-Clause license, see LICENSE for details.                --
 -- SPDX-License-Identifier: BSD-3-Clause                                            --
 -- ================================================================================ --
@@ -34,8 +34,10 @@ entity neorv32_sysinfo is
     DCACHE_NUM_BLOCKS : natural; -- d-cache: number of blocks (min 2), has to be a power of 2
     CACHE_BLOCK_SIZE  : natural; -- i-cache/d-cache: block size in bytes (min 4), has to be a power of 2
     CACHE_BURSTS_EN   : boolean; -- i-cache/d-cache: enable issuing of burst transfer for cache update
-    XBUS_EN           : boolean; -- implement external memory bus interface
-    OCD_EN            : boolean; -- implement OCD
+    CACHE_UC_BASE     : std_ulogic_vector(3 downto 0); -- start of uncached address space (256MB page)
+    SMC_EN            : boolean; -- implement serial memory controller (SMC)
+    XBUS_EN           : boolean; -- implement external memory bus interface (XBUS)
+    OCD_EN            : boolean; -- implement on-chip debugger (OCD)
     OCD_AUTH          : boolean; -- implement OCD authenticator
     IO_GPIO_EN        : boolean; -- implement general purpose IO port (GPIO)
     IO_CLINT_EN       : boolean; -- implement machine local interruptor (CLINT)
@@ -62,7 +64,7 @@ entity neorv32_sysinfo is
     bus_req_i : in  bus_req_t;  -- bus request
     bus_rsp_o : out bus_rsp_t   -- bus response
   );
-end neorv32_sysinfo;
+end entity;
 
 architecture neorv32_sysinfo_rtl of neorv32_sysinfo is
 
@@ -84,7 +86,7 @@ architecture neorv32_sysinfo_rtl of neorv32_sysinfo is
 
 begin
 
-  -- SYSINFO(0): Processor Clock Frequency in Hz --------------------------------------------
+  -- SYSINFO(0): Processor Clock Frequency --------------------------------------------------
   -- -------------------------------------------------------------------------------------------
   sysinfo_clk: process(rstn_i, clk_i)
   begin
@@ -95,7 +97,7 @@ begin
         sysinfo(0) <= bus_req_i.data;
       end if;
     end if;
-  end process sysinfo_clk;
+  end process;
 
   -- SYSINFO(1): Misc -----------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
@@ -115,7 +117,7 @@ begin
   sysinfo(2)(4)  <= '1' when OCD_EN            else '0'; -- on-chip debugger implemented
   sysinfo(2)(5)  <= '1' when ICACHE_EN         else '0'; -- processor-internal instruction cache implemented
   sysinfo(2)(6)  <= '1' when DCACHE_EN         else '0'; -- processor-internal data cache implemented
-  sysinfo(2)(7)  <= '0';                                 -- reserved
+  sysinfo(2)(7)  <= '1' when SMC_EN            else '0'; -- serial memory controller implemented
   sysinfo(2)(8)  <= '0';                                 -- reserved
   sysinfo(2)(9)  <= '0';                                 -- reserved
   sysinfo(2)(10) <= '0';                                 -- reserved
@@ -139,21 +141,16 @@ begin
   sysinfo(2)(28) <= '1' when IO_GPTMR_EN       else '0'; -- general purpose timer (GPTMR) implemented
   sysinfo(2)(29) <= '1' when IO_SLINK_EN       else '0'; -- stream link interface (SLINK) implemented
   sysinfo(2)(30) <= '1' when IO_ONEWIRE_EN     else '0'; -- 1-wire interface (ONEWIRE) implemented
-  sysinfo(2)(31) <= '0';                                 -- reserved
+  sysinfo(2)(31) <= '1' when is_simulation_c   else '0'; -- "You ever have that feeling where you're not sure if you're awake or still dreaming?" - Neo, The Matrix
 
-  -- SYSINFO(4): Cache Configuration --------------------------------------------------------
+  -- SYSINFO(3): Cache Configuration --------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  sysinfo(3)(3 downto 0)   <= std_ulogic_vector(to_unsigned(log2_c_bsize_c, 4)) when ICACHE_EN else (others => '0'); -- i-cache: log2(block_size_in_bytes)
-  sysinfo(3)(7 downto 4)   <= std_ulogic_vector(to_unsigned(log2_ic_bnum_c, 4)) when ICACHE_EN else (others => '0'); -- i-cache: log2(number_of_block)
-  --
-  sysinfo(3)(11 downto 8)  <= std_ulogic_vector(to_unsigned(log2_c_bsize_c, 4)) when DCACHE_EN else (others => '0'); -- d-cache: log2(block_size)
-  sysinfo(3)(15 downto 12) <= std_ulogic_vector(to_unsigned(log2_dc_bnum_c, 4)) when DCACHE_EN else (others => '0'); -- d-cache: log2(num_blocks)
-  --
-  sysinfo(3)(16) <= '1' when (ICACHE_EN and CACHE_BURSTS_EN) else '0'; -- i-cache: enable burst transfers
-  sysinfo(3)(23 downto 17) <= (others => '0'); -- reserved
-  --
-  sysinfo(3)(24) <= '1' when (DCACHE_EN and CACHE_BURSTS_EN) else '0'; -- d-cache: enable burst transfers
-  sysinfo(3)(31 downto 25) <= (others => '0'); -- reserved
+  sysinfo(3)(3 downto 0)   <= std_ulogic_vector(to_unsigned(log2_c_bsize_c, 4)) when ICACHE_EN or DCACHE_EN else (others => '0'); -- I$/D$ log2(block_size)
+  sysinfo(3)(7 downto 4)   <= std_ulogic_vector(to_unsigned(log2_ic_bnum_c, 4)) when ICACHE_EN else (others => '0'); -- I$ log2(number_of_blocks)
+  sysinfo(3)(11 downto 8)  <= std_ulogic_vector(to_unsigned(log2_dc_bnum_c, 4)) when DCACHE_EN else (others => '0'); -- D$ log2(number_of_blocks)
+  sysinfo(3)(15 downto 12) <= CACHE_UC_BASE when ICACHE_EN or DCACHE_EN else (others => '0'); -- start of non-cached address space (256MB page)
+  sysinfo(3)(16)           <= '1' when CACHE_BURSTS_EN and (ICACHE_EN or DCACHE_EN) else '0'; -- burst transfers enabled
+  sysinfo(3)(31 downto 17) <= (others => '0'); -- reserved
 
   -- Bus Response ---------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
@@ -171,6 +168,6 @@ begin
         end if;
       end if;
     end if;
-  end process bus_response;
+  end process;
 
-end neorv32_sysinfo_rtl;
+end architecture;

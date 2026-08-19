@@ -3,7 +3,7 @@
 -- -------------------------------------------------------------------------------- --
 -- The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              --
 -- Copyright (c) NEORV32 contributors.                                              --
--- Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  --
+-- Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  --
 -- Licensed under the BSD-3-Clause license, see LICENSE for details.                --
 -- SPDX-License-Identifier: BSD-3-Clause                                            --
 -- ================================================================================ --
@@ -18,6 +18,7 @@ use neorv32.neorv32_package.all;
 
 entity xbus_memory is
   generic (
+    MEM_RST  : boolean := false; -- enable reset to all-zero
     MEM_SIZE : natural := 4; -- memory size in bytes; min 4; should be a power of two
     MEM_LATE : natural := 1; -- number of latency cycles (min 1)
     MEM_FILE : string  := "" -- memory initialization file (plain HEX), no initialization if empty
@@ -28,7 +29,7 @@ entity xbus_memory is
     xbus_req_i : in  xbus_req_t;
     xbus_rsp_o : out xbus_rsp_t
   );
-end xbus_memory;
+end entity;
 
 architecture xbus_memory_rtl of xbus_memory is
 
@@ -43,7 +44,7 @@ architecture xbus_memory_rtl of xbus_memory is
     file     hex_file   : text;
     variable hex_line_v : line;
     variable hex_char_v : character;
-    variable tmp_v      : natural;
+    variable tmp_v      : bit_vector(3 downto 0);
     variable word_v     : bit_vector(31 downto 0);
     variable mem_v      : ram8bv_t(0 to num_words-1);
     variable index_v    : natural;
@@ -60,32 +61,32 @@ architecture xbus_memory_rtl of xbus_memory is
         for i in 7 downto 0 loop -- get full 32-bit word in 'word_v'; no VHDL2008 required
           read(hex_line_v, hex_char_v);
           case hex_char_v is
-            when '0'       => tmp_v := 0;
-            when '1'       => tmp_v := 1;
-            when '2'       => tmp_v := 2;
-            when '3'       => tmp_v := 3;
-            when '4'       => tmp_v := 4;
-            when '5'       => tmp_v := 5;
-            when '6'       => tmp_v := 6;
-            when '7'       => tmp_v := 7;
-            when '8'       => tmp_v := 8;
-            when '9'       => tmp_v := 9;
-            when 'a' | 'A' => tmp_v := 10;
-            when 'b' | 'B' => tmp_v := 11;
-            when 'c' | 'C' => tmp_v := 12;
-            when 'd' | 'D' => tmp_v := 13;
-            when 'e' | 'E' => tmp_v := 14;
-            when 'f' | 'F' => tmp_v := 15;
-            when others    => tmp_v := 0;
+            when '0'       => tmp_v := x"0";
+            when '1'       => tmp_v := x"1";
+            when '2'       => tmp_v := x"2";
+            when '3'       => tmp_v := x"3";
+            when '4'       => tmp_v := x"4";
+            when '5'       => tmp_v := x"5";
+            when '6'       => tmp_v := x"6";
+            when '7'       => tmp_v := x"7";
+            when '8'       => tmp_v := x"8";
+            when '9'       => tmp_v := x"9";
+            when 'a' | 'A' => tmp_v := x"a";
+            when 'b' | 'B' => tmp_v := x"b";
+            when 'c' | 'C' => tmp_v := x"c";
+            when 'd' | 'D' => tmp_v := x"d";
+            when 'e' | 'E' => tmp_v := x"e";
+            when 'f' | 'F' => tmp_v := x"f";
+            when others    => tmp_v := x"0";
           end case;
-          word_v(i*4+3 downto i*4+0) := to_bitvector(std_ulogic_vector((to_unsigned(tmp_v, 4))));
+          word_v(i*4+3 downto i*4+0) := tmp_v;
         end loop;
         mem_v(index_v) := word_v(byte_sel*8+7 downto byte_sel*8+0); -- extract desired byte
         index_v := index_v + 1;
       end loop;
     end if;
     return mem_v;
-  end function init_mem8bv_from_hexfile_f;
+  end function;
 
   -- memory access --
   signal addr  : unsigned(addr_bits_c-1 downto 0);
@@ -103,7 +104,7 @@ begin
 
   -- Pre-Initialized Memory (all-zero or HEX image if specified) ----------------------------
   -- -------------------------------------------------------------------------------------------
-  memory_data: process(clk_i)
+  memory_data: process(rstn_i, clk_i)
     -- [NOTE] The memory is split into four sub-memories using _variables_ of
     -- type 'bit_vector' to minimize the simulator's RAM footprint.
     variable mem8bv_b0_v : ram8bv_t(0 to (MEM_SIZE/4)-1) := init_mem8bv_from_hexfile_f(MEM_FILE, MEM_SIZE/4, 0);
@@ -111,7 +112,12 @@ begin
     variable mem8bv_b2_v : ram8bv_t(0 to (MEM_SIZE/4)-1) := init_mem8bv_from_hexfile_f(MEM_FILE, MEM_SIZE/4, 2);
     variable mem8bv_b3_v : ram8bv_t(0 to (MEM_SIZE/4)-1) := init_mem8bv_from_hexfile_f(MEM_FILE, MEM_SIZE/4, 3);
   begin
-    if rising_edge(clk_i) then
+    if MEM_RST and (rstn_i = '0') then
+      mem8bv_b0_v := (others => (others => '0'));
+      mem8bv_b1_v := (others => (others => '0'));
+      mem8bv_b2_v := (others => (others => '0'));
+      mem8bv_b3_v := (others => (others => '0'));
+    elsif rising_edge(clk_i) then
       if (xbus_req_i.cyc = '1') and (xbus_req_i.stb = '1') then
         if (xbus_req_i.we = '1') then
           if (xbus_req_i.sel(0) = '1') then
@@ -142,7 +148,7 @@ begin
         end if;
       end if;
     end if;
-  end process memory_data;
+  end process;
 
   addr <= unsigned(xbus_req_i.addr(addr_bits_c+1 downto 2));
 
@@ -153,7 +159,7 @@ begin
     elsif rising_edge(clk_i) then
       ack <= xbus_req_i.cyc and xbus_req_i.stb;
     end if;
-  end process memory_ack;
+  end process;
 
 
   -- Latency Generator ----------------------------------------------------------------------
@@ -171,7 +177,7 @@ begin
         late_ack(i+1)  <= late_ack(i);
       end loop;
     end if;
-  end process latency_gen;
+  end process;
 
   -- delay select --
   dout <= rdata when (MEM_LATE = 1) else late_data(MEM_LATE-1);
@@ -182,5 +188,4 @@ begin
   xbus_rsp_o.ack  <= aout;
   xbus_rsp_o.err  <= '0';
 
-
-end xbus_memory_rtl;
+end architecture;

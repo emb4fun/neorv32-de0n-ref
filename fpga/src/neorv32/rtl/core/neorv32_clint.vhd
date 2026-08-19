@@ -6,7 +6,7 @@
 -- -------------------------------------------------------------------------------- --
 -- The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              --
 -- Copyright (c) NEORV32 contributors.                                              --
--- Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  --
+-- Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  --
 -- Licensed under the BSD-3-Clause license, see LICENSE for details.                --
 -- SPDX-License-Identifier: BSD-3-Clause                                            --
 -- ================================================================================ --
@@ -23,57 +23,29 @@ entity neorv32_clint is
     NUM_HARTS : natural range 1 to 4095 -- number of physical CPU cores
   );
   port (
-    clk_i     : in  std_ulogic; -- global clock line
-    rstn_i    : in  std_ulogic; -- global reset line, low-active, async
-    bus_req_i : in  bus_req_t; -- bus request
-    bus_rsp_o : out bus_rsp_t; -- bus response
-    time_o    : out std_ulogic_vector(63 downto 0); -- current system time
+    clk_i     : in  std_ulogic;                              -- global clock line
+    rstn_i    : in  std_ulogic;                              -- global reset line, low-active, async
+    bus_req_i : in  bus_req_t;                               -- bus request
+    bus_rsp_o : out bus_rsp_t;                               -- bus response
+    time_o    : out std_ulogic_vector(63 downto 0);          -- current system time (HI/LO are not synchronized!)
     mti_o     : out std_ulogic_vector(NUM_HARTS-1 downto 0); -- machine timer interrupt
-    msi_o     : out std_ulogic_vector(NUM_HARTS-1 downto 0) -- machine software interrupt
+    msi_o     : out std_ulogic_vector(NUM_HARTS-1 downto 0)  -- machine software interrupt
   );
-end neorv32_clint;
+end entity;
 
 architecture neorv32_clint_rtl of neorv32_clint is
-
-  -- global machine timer --
-  component neorv32_clint_mtime
-  port (
-    clk_i   : in  std_ulogic;
-    rstn_i  : in  std_ulogic;
-    en_i    : in  std_ulogic;
-    rw_i    : in  std_ulogic;
-    addr_i  : in  std_ulogic;
-    wdata_i : in  std_ulogic_vector(31 downto 0);
-    rdata_o : out std_ulogic_vector(31 downto 0);
-    mtime_o : out std_ulogic_vector(63 downto 0)
-  );
-  end component;
 
   -- timer interrupt generator --
   component neorv32_clint_mtimecmp
   port (
     clk_i   : in  std_ulogic;
     rstn_i  : in  std_ulogic;
-    en_i    : in  std_ulogic;
-    rw_i    : in  std_ulogic;
-    addr_i  : in  std_ulogic;
-    wdata_i : in  std_ulogic_vector(31 downto 0);
-    rdata_o : out std_ulogic_vector(31 downto 0);
     mtime_i : in  std_ulogic_vector(63 downto 0);
-    mti_o   : out std_ulogic
-  );
-  end component;
-
-  -- software interrupt trigger --
-  component neorv32_clint_swi
-  port (
-    clk_i   : in  std_ulogic;
-    rstn_i  : in  std_ulogic;
-    en_i    : in  std_ulogic;
-    rw_i    : in  std_ulogic;
+    we_i    : in  std_ulogic_vector(1 downto 0);
+    re_i    : in  std_ulogic_vector(1 downto 0);
     wdata_i : in  std_ulogic_vector(31 downto 0);
     rdata_o : out std_ulogic_vector(31 downto 0);
-    swi_o   : out std_ulogic
+    mti_o   : out std_ulogic
   );
   end component;
 
@@ -82,52 +54,55 @@ architecture neorv32_clint_rtl of neorv32_clint is
   constant base_mtimecmp_c : unsigned(15 downto 0) := x"4000";
   constant base_mtime_c    : unsigned(15 downto 0) := x"bff8";
 
-  -- device access --
-  signal mtime_en    : std_ulogic;
+  -- mtime access --
+  signal mtime_en : std_ulogic;
+  signal mtime_we : std_ulogic_vector(1 downto 0);
+
+  -- mtimecmp access --
+  type mtimecmp_rwe_t is array (0 to NUM_HARTS-1) of std_ulogic_vector(1 downto 0);
+  signal mtimecmp_we : mtimecmp_rwe_t;
+  signal mtimecmp_re : mtimecmp_rwe_t;
   signal mtimecmp_en : std_ulogic_vector(NUM_HARTS-1 downto 0);
-  signal mswi_en     : std_ulogic_vector(NUM_HARTS-1 downto 0);
+
+  -- mswi access --
+  signal mswi_en, mswi : std_ulogic_vector(NUM_HARTS-1 downto 0);
 
   -- read-back --
   type rb32_t is array (0 to NUM_HARTS-1) of std_ulogic_vector(31 downto 0);
-  signal mtime_rd    : std_ulogic_vector(31 downto 0);
   signal mtimecmp_rd : rb32_t;
   signal mswi_rd     : rb32_t;
+  signal mtime       : std_ulogic_vector(63 downto 0);
+  signal mtime_rd    : std_ulogic_vector(31 downto 0);
   signal rdata       : std_ulogic_vector(31 downto 0);
-
-  -- misc --
-  signal mtime : std_ulogic_vector(63 downto 0);
-  signal ack_q : std_ulogic;
 
 begin
 
   -- MTIME - Global Machine Timer -----------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  neorv32_clint_mtime_inst: neorv32_clint_mtime
+  neorv32_clint_mtime_inst: entity neorv32.neorv32_prim_cnt
+  generic map (
+    CWIDTH => 64
+  )
   port map (
-    clk_i   => clk_i,
-    rstn_i  => rstn_i,
-    en_i    => mtime_en,
-    rw_i    => bus_req_i.rw,
-    addr_i  => bus_req_i.addr(2),
-    wdata_i => bus_req_i.data,
-    rdata_o => mtime_rd,
-    mtime_o => mtime
+    clk_i  => clk_i,
+    rstn_i => rstn_i,
+    inc_i  => '1', -- permanent increment
+    we_i   => mtime_we,
+    data_i => bus_req_i.data,
+    oe_i   => '1', -- permanent output (required for MTIME comparators)
+    cnt_o  => mtime
   );
 
   -- device access --
   mtime_en <= '1' when (bus_req_i.stb = '1') and (unsigned(bus_req_i.addr(15 downto 3)) = base_mtime_c(15 downto 3)) else '0';
+  mtime_we(0) <= mtime_en and bus_req_i.rw and (not bus_req_i.addr(2));
+  mtime_we(1) <= mtime_en and bus_req_i.rw and (    bus_req_i.addr(2));
 
-  -- system time output: synchronize low and high words --
-  time_output: process(rstn_i, clk_i)
-  begin
-    if (rstn_i = '0') then
-      time_o(31 downto 0) <= (others => '0');
-    elsif rising_edge(clk_i) then
-      time_o(31 downto 0) <= mtime(31 downto 0);
-    end if;
-  end process time_output;
+  -- subword read-back --
+  mtime_rd <= (others => '0') when (mtime_en = '0') else mtime(63 downto 32) when (bus_req_i.addr(2) = '1') else mtime(31 downto 0);
 
-  time_o(63 downto 32) <= mtime(63 downto 32);
+  -- system time output: high and low word are not synchronized! --
+  time_o <= mtime;
 
 
   -- MTIMECMP - Per-Hart Time Comparator / Interrupt Generator ------------------------------
@@ -139,17 +114,20 @@ begin
     port map (
       clk_i   => clk_i,
       rstn_i  => rstn_i,
-      en_i    => mtimecmp_en(i),
-      rw_i    => bus_req_i.rw,
-      addr_i  => bus_req_i.addr(2),
+      mtime_i => mtime,
+      we_i    => mtimecmp_we(i),
+      re_i    => mtimecmp_re(i),
       wdata_i => bus_req_i.data,
       rdata_o => mtimecmp_rd(i),
-      mtime_i => mtime,
       mti_o   => mti_o(i)
     );
 
     -- device access --
     mtimecmp_en(i) <= '1' when (bus_req_i.stb = '1') and (unsigned(bus_req_i.addr(15 downto 3)) = (base_mtimecmp_c(15 downto 3) + i)) else '0';
+    mtimecmp_we(i)(0) <= mtimecmp_en(i) and (    bus_req_i.rw) and (not bus_req_i.addr(2));
+    mtimecmp_we(i)(1) <= mtimecmp_en(i) and (    bus_req_i.rw) and (    bus_req_i.addr(2));
+    mtimecmp_re(i)(0) <= mtimecmp_en(i) and (not bus_req_i.rw) and (not bus_req_i.addr(2));
+    mtimecmp_re(i)(1) <= mtimecmp_en(i) and (not bus_req_i.rw) and (    bus_req_i.addr(2));
 
   end generate;
 
@@ -159,19 +137,25 @@ begin
   neorv32_clint_swi_gen:
   for i in 0 to NUM_HARTS-1 generate
 
-    neorv32_clint_swi_inst: neorv32_clint_swi
-    port map (
-      clk_i   => clk_i,
-      rstn_i  => rstn_i,
-      en_i    => mswi_en(i),
-      rw_i    => bus_req_i.rw,
-      wdata_i => bus_req_i.data,
-      rdata_o => mswi_rd(i),
-      swi_o   => msi_o(i)
-    );
+    mswi_reg: process(rstn_i, clk_i)
+    begin
+      if (rstn_i = '0') then
+        mswi(i) <= '0';
+      elsif rising_edge(clk_i) then
+        if (mswi_en(i) = '1') and (bus_req_i.rw = '1') then
+          mswi(i) <= bus_req_i.data(0);
+        end if;
+      end if;
+    end process mswi_reg;
+
+    -- interrupt output --
+    msi_o(i) <= mswi(i);
 
     -- device access --
     mswi_en(i) <= '1' when (bus_req_i.stb = '1') and (unsigned(bus_req_i.addr(15 downto 2)) = (base_mswi_c(15 downto 2) + i)) else '0';
+
+    -- read-back --
+    mswi_rd(i) <= (others => '0') when (mswi_en(i) = '0') else (x"0000000" & "000" & mswi(i));
 
   end generate;
 
@@ -186,7 +170,7 @@ begin
       tmp_v := tmp_v or mtimecmp_rd(i) or mswi_rd(i);
     end loop;
     rdata <= mtime_rd or tmp_v;
-  end process read_back;
+  end process;
 
 
   -- Bus Response ---------------------------------------------------------------------------
@@ -194,99 +178,17 @@ begin
   bus_response: process(rstn_i, clk_i)
   begin
     if (rstn_i = '0') then
-      ack_q <= '0';
+      bus_rsp_o <= rsp_terminate_c;
     elsif rising_edge(clk_i) then
-      ack_q <= mtime_en or or_reduce_f(mtimecmp_en) or or_reduce_f(mswi_en);
-    end if;
-  end process bus_response;
-
-  bus_rsp_o.ack  <= ack_q;
-  bus_rsp_o.err  <= '0';
-  bus_rsp_o.data <= rdata;
-
-
-end neorv32_clint_rtl;
-
-
--- ================================================================================ --
--- NEORV32 SoC - CLINT MTIME (global machine timer)                                 --
--- -------------------------------------------------------------------------------- --
--- The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              --
--- Copyright (c) NEORV32 contributors.                                              --
--- Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  --
--- Licensed under the BSD-3-Clause license, see LICENSE for details.                --
--- SPDX-License-Identifier: BSD-3-Clause                                            --
--- ================================================================================ --
-
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
-entity neorv32_clint_mtime is
-  port (
-    clk_i   : in  std_ulogic; -- global clock line
-    rstn_i  : in  std_ulogic; -- global reset line, low-active, async
-    en_i    : in  std_ulogic; -- access-enable
-    rw_i    : in  std_ulogic; -- read (0) / write (1)
-    addr_i  : in  std_ulogic; -- low/high word select
-    wdata_i : in  std_ulogic_vector(31 downto 0); -- write data
-    rdata_o : out std_ulogic_vector(31 downto 0); -- read data
-    mtime_o : out std_ulogic_vector(63 downto 0)  -- global mtime.time (async words!)
-  );
-end neorv32_clint_mtime;
-
-architecture neorv32_clint_mtime_rtl of neorv32_clint_mtime is
-
-  signal we_q, re_q : std_ulogic_vector(1 downto 0);
-  signal mtime_q : std_ulogic_vector(63 downto 0);
-  signal carry_q : std_ulogic_vector(0 downto 0);
-  signal inc_lo, inc_hi : std_ulogic_vector(32 downto 0);
-
-begin
-
-  -- 64-Bit Timer Core (split into two 32-bit registers) ------------------------------------
-  -- -------------------------------------------------------------------------------------------
-  mtime_core: process(rstn_i, clk_i)
-  begin
-    if (rstn_i = '0') then
-      we_q    <= (others => '0');
-      re_q    <= (others => '0');
-      mtime_q <= (others => '0');
-      carry_q <= (others => '0');
-    elsif rising_edge(clk_i) then
-      we_q(0) <= en_i and rw_i and (not addr_i);
-      we_q(1) <= en_i and rw_i and (    addr_i);
-      re_q(0) <= en_i and (not addr_i);
-      re_q(1) <= en_i and (    addr_i);
-      -- low-word --
-      if (we_q(0) = '1') then
-        mtime_q(31 downto 0) <= wdata_i;
-      else
-        mtime_q(31 downto 0) <= inc_lo(31 downto 0);
-      end if;
-      carry_q(0) <= inc_lo(32); -- low-to-high carry
-      -- high-word --
-      if (we_q(1) = '1') then
-        mtime_q(63 downto 32) <= wdata_i;
-      else
-        mtime_q(63 downto 32) <= inc_hi(31 downto 0);
+      bus_rsp_o <= rsp_terminate_c;
+      bus_rsp_o.ack <= mtime_en or or_reduce_f(mtimecmp_en) or or_reduce_f(mswi_en);
+      if (bus_req_i.stb = '1') then
+        bus_rsp_o.data <= rdata;
       end if;
     end if;
-  end process mtime_core;
+  end process;
 
-  -- increments --
-  inc_lo <= std_ulogic_vector(unsigned('0' & mtime_q(31 downto  0)) + 1);
-  inc_hi <= std_ulogic_vector(unsigned('0' & mtime_q(63 downto 32)) + unsigned(carry_q));
-
-  -- global time output; low and high words are off-sync by one cycle! --
-  mtime_o <= mtime_q;
-
-  -- read access --
-  rdata_o <= mtime_q(63 downto 32) when (re_q(1) = '1') else
-             mtime_q(31 downto  0) when (re_q(0) = '1') else (others => '0');
-
-
-end neorv32_clint_mtime_rtl;
+end architecture;
 
 
 -- ================================================================================ --
@@ -294,7 +196,7 @@ end neorv32_clint_mtime_rtl;
 -- -------------------------------------------------------------------------------- --
 -- The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              --
 -- Copyright (c) NEORV32 contributors.                                              --
--- Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  --
+-- Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  --
 -- Licensed under the BSD-3-Clause license, see LICENSE for details.                --
 -- SPDX-License-Identifier: BSD-3-Clause                                            --
 -- ================================================================================ --
@@ -307,19 +209,17 @@ entity neorv32_clint_mtimecmp is
   port (
     clk_i   : in  std_ulogic; -- global clock line
     rstn_i  : in  std_ulogic; -- global reset line, low-active, async
-    en_i    : in  std_ulogic; -- access-enable
-    rw_i    : in  std_ulogic; -- read (0) / write (1)
-    addr_i  : in  std_ulogic; -- low/high word select
+    mtime_i : in  std_ulogic_vector(63 downto 0); -- global mtime (async words!)
+    we_i    : in  std_ulogic_vector(1 downto 0); -- HI/LO word write enable
+    re_i    : in  std_ulogic_vector(1 downto 0); -- HI/LO word read enable
     wdata_i : in  std_ulogic_vector(31 downto 0); -- write data
     rdata_o : out std_ulogic_vector(31 downto 0); -- read data
-    mtime_i : in  std_ulogic_vector(63 downto 0); -- global mtime.time (async words!)
     mti_o   : out std_ulogic -- interrupt
   );
-end neorv32_clint_mtimecmp;
+end entity;
 
 architecture neorv32_clint_mtimecmp_rtl of neorv32_clint_mtimecmp is
 
-  signal rden_q : std_ulogic_vector(1 downto 0);
   signal mtimecmp_q : std_ulogic_vector(63 downto 0);
   signal cmp_lo_eq, cmp_lo_gt, cmp_lo_ge, cmp_hi_eq, cmp_hi_gt : std_ulogic;
 
@@ -330,38 +230,31 @@ begin
   write_access: process(rstn_i, clk_i)
   begin
     if (rstn_i = '0') then
-      rden_q     <= (others => '0');
       mtimecmp_q <= (others => '0');
     elsif rising_edge(clk_i) then
-      rden_q(0) <= en_i and (not addr_i);
-      rden_q(1) <= en_i and (    addr_i);
-      if (en_i = '1') and (rw_i = '1') then
-        if (addr_i = '0') then
-          mtimecmp_q(31 downto 0) <= wdata_i;
-        else
-          mtimecmp_q(63 downto 32) <= wdata_i;
-        end if;
+      if (we_i(0) = '1') then
+        mtimecmp_q(31 downto 0) <= wdata_i;
+      end if;
+      if (we_i(1) = '1') then
+        mtimecmp_q(63 downto 32) <= wdata_i;
       end if;
     end if;
-  end process write_access;
+  end process;
 
   -- read access --
-  rdata_o <= mtimecmp_q(63 downto 32) when (rden_q(1) = '1') else
-             mtimecmp_q(31 downto 00) when (rden_q(0) = '1') else (others => '0');
+  rdata_o <= mtimecmp_q(63 downto 32) when (re_i(1) = '1') else
+             mtimecmp_q(31 downto 00) when (re_i(0) = '1') else (others => '0');
 
 
   -- Interrupt Generator (comparator is split across two cycles) ----------------------------
   -- -------------------------------------------------------------------------------------------
-  irq_gen: process(rstn_i, clk_i)
+  irq_gen: process(clk_i)
   begin
-    if (rstn_i = '0') then
-      cmp_lo_ge <= '0';
-      mti_o     <= '0';
-    elsif rising_edge(clk_i) then
+    if rising_edge(clk_i) then
       cmp_lo_ge <= cmp_lo_gt or cmp_lo_eq; -- low word greater-than or equal
       mti_o     <= cmp_hi_gt or (cmp_hi_eq and cmp_lo_ge);
     end if;
-  end process irq_gen;
+  end process;
 
   -- sub-word comparators; there is one cycle delay between low (earlier) and high (later) word --
   cmp_lo_eq <= '1' when (unsigned(mtime_i(31 downto  0)) = unsigned(mtimecmp_q(31 downto  0))) else '0';
@@ -369,62 +262,4 @@ begin
   cmp_hi_eq <= '1' when (unsigned(mtime_i(63 downto 32)) = unsigned(mtimecmp_q(63 downto 32))) else '0';
   cmp_hi_gt <= '1' when (unsigned(mtime_i(63 downto 32)) > unsigned(mtimecmp_q(63 downto 32))) else '0';
 
-
-end neorv32_clint_mtimecmp_rtl;
-
-
--- ================================================================================ --
--- NEORV32 SoC - CLINT SWI (software interrupt trigger)                             --
--- -------------------------------------------------------------------------------- --
--- The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              --
--- Copyright (c) NEORV32 contributors.                                              --
--- Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  --
--- Licensed under the BSD-3-Clause license, see LICENSE for details.                --
--- SPDX-License-Identifier: BSD-3-Clause                                            --
--- ================================================================================ --
-
-library ieee;
-use ieee.std_logic_1164.all;
-
-entity neorv32_clint_swi is
-  port (
-    clk_i   : in  std_ulogic; -- global clock line
-    rstn_i  : in  std_ulogic; -- global reset line, low-active, async
-    en_i    : in  std_ulogic; -- access-enable
-    rw_i    : in  std_ulogic; -- read (0) / write (1)
-    wdata_i : in  std_ulogic_vector(31 downto 0); -- write data
-    rdata_o : out std_ulogic_vector(31 downto 0); -- read data
-    swi_o   : out std_ulogic -- interrupt
-  );
-end neorv32_clint_swi;
-
-architecture neorv32_clint_swi_rtl of neorv32_clint_swi is
-
-  signal rden_q, sip_q : std_ulogic;
-
-begin
-
-  -- MSI Access -----------------------------------------------------------------------------
-  -- -------------------------------------------------------------------------------------------
-  write_access: process(rstn_i, clk_i)
-  begin
-    if (rstn_i = '0') then
-      rden_q <= '0';
-      sip_q  <= '0';
-    elsif rising_edge(clk_i) then
-      rden_q <= en_i;
-      if (en_i = '1') and (rw_i = '1') then
-        sip_q <= wdata_i(0);
-      end if;
-    end if;
-  end process write_access;
-
-  -- read access --
-  rdata_o(31 downto 1) <= (others => '0');
-  rdata_o(0) <= sip_q when (rden_q = '1') else '0';
-
-  -- interrupt --
-  swi_o <= sip_q;
-
-
-end neorv32_clint_swi_rtl;
+end architecture;

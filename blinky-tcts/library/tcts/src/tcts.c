@@ -1,7 +1,7 @@
 /**************************************************************************
 *  This file is part of the TCTS project (Tiny Cooperative Task Scheduler)
 *
-*  Copyright (c) 2014-2024 by Michael Fischer (www.emb4fun.de).
+*  Copyright (c) 2014-2026 by Michael Fischer (www.emb4fun.de).
 *  All rights reserved.
 *
 *  Redistribution and use in source and binary forms, with or without
@@ -77,6 +77,17 @@
 *  25.02.2021  mifi  Change version to v0.21.0.
 *                    Added OS_TaskWakeup and OS_TaskIsSleeping.
 *  16.05.2021  mifi  Change version to v0.22.0.
+*  08.06.2026  mifi  Fix OS_MutexSignal handoff to waiting task.
+*                    Version was changed to v0.23.0 in the past because
+*                    of the new Message queue functionality:
+*                    - OS_MQCreate
+*                    - OS_MQPost
+*                    - OS_MQPostFromInt
+*                    - OS_MQWait
+*                    - OS_MQGroupCreate
+*                    - OS_MQGroupJoin
+*                    - OS_MQGroupLeave
+*                    - OS_MQGroupWait
 **************************************************************************/
 #define __TCTS_C__
 
@@ -439,11 +450,9 @@ static __inline__ OS_TCB *TCBFifoRemove (os_tcb_fifo_t *pFifo)
       pFifo->pOut->pNext = NULL;    /* Remove the link from the new last element to the next one */
    }
 
-#if 1 /* TODO: Is this realy needed ? */
    /* Clear fifo pointer */
    pTask->pPrev = NULL;
    pTask->pNext = NULL;
-#endif
 
    return(pTask);
 } /* TCBFifoRemove */
@@ -1735,6 +1744,19 @@ void OS_TaskSetStateNotInUsed (OS_TCB *pTCB)
 } /* OS_TaskSetNotInUsed */
 
 /*************************************************************************/
+/*  OS_TimerUserCallback                                                 */
+/*                                                                       */
+/*  In    : none                                                         */
+/*  Out   : none                                                         */
+/*  Return: none                                                         */
+/*************************************************************************/
+void __attribute__((weak)) OS_TimerUserCallback (uint32_t _dSystemTick)
+{
+   /* Only an empty function */
+   (void)_dSystemTick;
+} /* OS_TimerUserCallback */
+
+/*************************************************************************/
 /*  OS_TimerCallback                                                     */
 /*                                                                       */
 /*  This function will be called from the Systick interrupt.             */
@@ -1769,7 +1791,6 @@ void OS_TimerCallback (void)
     */
    HandleWaitList();
 
-
    /*
     * Check user timer
     */
@@ -1785,6 +1806,11 @@ void OS_TimerCallback (void)
          UserTimer = NULL;
       }
    }
+   
+   /*
+    * User timer callback
+    */
+   OS_TimerUserCallback(dSystemTick);    
 
 } /* OS_TimerCallback */
 
@@ -2532,26 +2558,28 @@ static __inline__ int _OSMutexSignalFromInt (OS_MUTEX *pMutex)
 
       if (0 == pMutex->nCounter)
       {
-         pMutex->Owner = NULL;
-
          /* Fifo not empty, remove task from the mutex fifo */
          pTask = TCBFifoRemove(&pMutex->Fifo);
 
-         /* Remove semaphore info */
+         /* Remove mutex info */
          pTask->pMutexWait = NULL;
 
          /* Removed the task from the WaitList too. */
          WaitListRemove(pTask);
          pTask->dTimeoutTicks = 0;
 
-         /* Return code for OSSemaWait */
+         /* Return code for OS_MutexWait */
          pTask->nReturnCode = OS_RC_OK;
 
-         /* Make the task which is waiting on the semaphore ready to run */
-         AddTaskToReadyList(pTask);
-      }
+         /* Hand the mutex over to the waiting task */
+         pMutex->Owner    = pTask;
+         pMutex->nCounter = 1;
 
-      rc = 1;
+         /* Make the task which is waiting on the mutex ready to run */
+         AddTaskToReadyList(pTask);
+
+         rc = 1;
+      }
    }
    else
    {
@@ -3282,7 +3310,11 @@ static __inline__  int _OS_MQPostFromInt (OS_MQ *pMQ, void *pMsg)
 /*************************************************************************/
 int OS_MQPostFromInt (OS_MQ *pMQ, void *pMsg)
 {
-   return(_OS_MQPostFromInt(pMQ, pMsg));
+   int rc;
+   
+   rc = _OS_MQPostFromInt(pMQ, pMsg);
+   
+   return(rc);
 } /* OS_MQPostFromInt */
 
 /*************************************************************************/
@@ -3300,11 +3332,32 @@ int OS_MQPost (OS_MQ *pMQ, void *pMsg)
 {
    int rc;
 
-   EnterCritical();
+#if defined(__ARM_ARCH_7EM__) || defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_8M_MAINLINE__)
+   if (InISR())
+   {
+      rc = _OS_MQPostFromInt(pMQ, pMsg);
+      
+      /* Add own pointer to the queue of the group */   
+      if (pMQ->pMboxGroup != NULL)
+      {
+         _OSMboxPostFromInt(pMQ->pMboxGroup, pMQ);
+      }
+   }
+   else
+#endif
+   {   
+      EnterCritical();
 
-   rc = _OS_MQPostFromInt(pMQ, pMsg);
+      rc = _OS_MQPostFromInt(pMQ, pMsg);
+      
+      /* Add own pointer to the queue of the group */   
+      if (pMQ->pMboxGroup != NULL)
+      {
+         _OSMboxPostFromInt(pMQ->pMboxGroup, pMQ);
+      }
 
-   ExitCritical();
+      ExitCritical();
+   }      
 
    return(rc);
 } /* OS_MQPost */
@@ -3368,6 +3421,95 @@ int OS_MQWait (OS_MQ *pMQ, void *pMsg, uint32_t dTimeoutMs)
 
    return(rc);
 } /* OS_MQWait */
+
+/*************************************************************************/
+/*  OS_MQGroupCreate                                                     */
+/*                                                                       */
+/*  Create a new group.                                                  */
+/*                                                                       */
+/*  In    : pMQgroup, pBuffer, nCounterMax                               */
+/*  Out   : none                                                         */
+/*  Return: none                                                         */
+/*************************************************************************/
+void OS_MQGroupCreate (OS_MQ_GROUP *pMQgroup, OS_MQ **pBuffer, uint16_t wCounterMax)
+{
+   OS_MboxCreate(pMQgroup, (void**)pBuffer, wCounterMax);
+} /* OS_MQGroupCreate */
+
+/*************************************************************************/
+/*  OS_MQGroupJoin                                                       */
+/*                                                                       */
+/*  In    : pMQ, pGroup                                                  */
+/*  Out   : none                                                         */
+/*  Return: OS_RC_OK / OS_RC_ERROR                                       */
+/*************************************************************************/
+int OS_MQGroupJoin (OS_MQ *pMQ, OS_MQ_GROUP *pGroup)
+{
+   int rc = OS_RC_ERROR;
+   
+   if ((pMQ != NULL) && (pGroup != NULL))
+   {
+      rc = OS_RC_OK;
+   
+      EnterCritical();
+      
+      pMQ->pMboxGroup = pGroup;
+
+      ExitCritical();
+   }
+
+   return(rc);
+} /* OS_MQGroupJoin */
+
+/*************************************************************************/
+/*  OS_MQGroupLeave                                                      */
+/*                                                                       */
+/*  In    : pMQ                                                          */
+/*  Out   : none                                                         */
+/*  Return: OS_RC_OK / OS_RC_ERROR                                       */
+/*************************************************************************/
+int OS_MQGroupLeave (OS_MQ *pMQ)
+{
+   int rc = OS_RC_ERROR;
+
+   if (pMQ != NULL)
+   {
+      rc = OS_RC_OK;
+   
+      EnterCritical();
+      
+      pMQ->pMboxGroup = NULL;
+
+      ExitCritical();
+   }
+
+   return(rc);
+} /* OS_MQGroupLeave */
+
+/*************************************************************************/
+/*  OS_MQGroupWait                                                       */
+/*                                                                       */
+/*  Blocks the task while waiting for the mailbox, with timeout.         */
+/*                                                                       */
+/*  In case the timeout value (dTimeoutMs) is 0, OSMboxWait will use     */
+/*  polling to acquire the message. If the resource counter (dCounter)   */
+/*  is 0, the error cause is OS_RC_TIMEOUT.                              */
+/*                                                                       */
+/*  With a timeout value (dTimeoutMs) of OS_WAIT_INFINITE the waiting    */
+/*  time is not ended until the mailbox is signaled.                     */
+/*                                                                       */
+/*  Note: Must not used from inside an interrupt.                        */
+/*                                                                       */
+/*  In    : pMbox, pMsg, dTimeoutMs                                      */
+/*  Out   : none                                                         */
+/*  Return: OS_RC_OK / OS_RC_TIMEOUT                                     */
+/*************************************************************************/
+int OS_MQGroupWait (OS_MQ_GROUP *pGroup, OS_MQ **pMQ, uint32_t dTimeoutMs)
+{
+   int rc = OS_MboxWait(pGroup, (void**)pMQ, dTimeoutMs);
+   
+   return(rc);
+} /* OS_MQGroupWait */
 
 #endif /* defined(RTOS_TCTS) */
 

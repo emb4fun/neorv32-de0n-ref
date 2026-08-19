@@ -1,7 +1,7 @@
 // ================================================================================ //
 // The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              //
 // Copyright (c) NEORV32 contributors.                                              //
-// Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  //
+// Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  //
 // Licensed under the BSD-3-Clause license, see LICENSE for details.                //
 // SPDX-License-Identifier: BSD-3-Clause                                            //
 // ================================================================================ //
@@ -9,7 +9,6 @@
 
 /**********************************************************************//**
  * @file demo_clint/main.c
- * @author Stephan Nolting
  * @brief Simple core local interruptor (CLINT) usage example.
  **************************************************************************/
 
@@ -54,24 +53,27 @@ int main() {
   }
 
   // Intro
-  neorv32_uart0_puts("RISC-V Core Local Interruptor (CLINT) demo Program.\n"
+  neorv32_uart0_puts("RISC-V Core-Local Interruptor (CLINT) demo Program.\n"
                      "Real-time clock using the RISC-V MTIMER interrupt.\n"
                      "Also toggles GPIO.output(0) at 1Hz.\n\n");
 
   // clear GPIO output port
+
+  // configure lowest 8 GPIO pins as outputs
   neorv32_gpio_port_set(0);
+  neorv32_gpio_dir_set(1); // pin 0 = output
 
   // setup date and time for the Unix time of CLINT.MTIMER
   date_t date;
-  date.year    = 2024; // current year (absolute)
-  date.month   = 12;   // 1..12
-  date.day     = 26;   // 1..31
-  date.hours   = 21;   // 0..23
-  date.minutes = 18;   // 0..59
-  date.seconds = 36;   // 0..59
+  date.year    = 2025; // current year (absolute)
+  date.month   = 10;   // 1..12
+  date.day     = 24;   // 1..31
+  date.hours   = 23;   // 0..23
+  date.minutes = 01;   // 0..59
+  date.seconds = 17;   // 0..59
 
   neorv32_clint_unixtime_set(neorv32_aux_date2unixtime(&date));
-  neorv32_uart0_printf("Unix timestamp: %u\n", (uint32_t)neorv32_clint_unixtime_get);
+  neorv32_uart0_printf("Unix timestamp: %u\n", (uint32_t)neorv32_clint_unixtime_get());
 
   // configure MTIME timer to not trigger
   neorv32_clint_mtimecmp_set(-1);
@@ -106,7 +108,7 @@ int main() {
  **************************************************************************/
 void mti_irq_handler(void) {
 
-  // configure MTIME timer's next interrupt to trigger after 1 second starting from now
+  // configure MTIME timer's next interrupt to trigger after 1 second MTIMECMP delta
   neorv32_clint_mtimecmp_set(neorv32_clint_mtimecmp_get() + neorv32_sysinfo_get_clk());
 
   // toggle output port bit 0

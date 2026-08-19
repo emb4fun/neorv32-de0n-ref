@@ -1,7 +1,7 @@
 // ================================================================================ //
 // The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              //
 // Copyright (c) NEORV32 contributors.                                              //
-// Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  //
+// Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  //
 // Licensed under the BSD-3-Clause license, see LICENSE for details.                //
 // SPDX-License-Identifier: BSD-3-Clause                                            //
 // ================================================================================ //
@@ -9,10 +9,9 @@
 
 /**********************************************************************//**
  * @file demo_cfu/main.c
- * @author Stephan Nolting
- * @brief Example program showing how to use the CFU's custom instructions (XTEA example).
- * @note Take a look at the highly-commented "hardware-counterpart" of this CFU
- * example in 'rtl/core/neorv32_cpu_cp_cfu.vhd'.
+ * @brief Example program showing how to use the CFU's custom instructions
+ * (XTEA example). Take a look at the commented "hardware-counterpart" of
+ * this CFU example in 'rtl/core/neorv32_cpu_cp_cfu.vhd'.
  **************************************************************************/
 #include <neorv32.h>
 
@@ -23,42 +22,49 @@
 /**@{*/
 /** UART BAUD rate */
 #define BAUD_RATE   19200
-/** Number XTEA rounds */
+/** Number of XTEA rounds */
 #define XTEA_ROUNDS 20
-/** Input data size (in number of 32-bit words), has to be even */
+/** Input data size (number of 32-bit words), has to be even */
 #define DATA_NUM    64
 /**@}*/
 
 
 /**********************************************************************//**
- * @name Define macros for easy CFU instruction wrapping
+ * @name Define XTEA CFU instruction based on the intrinsic templates
  **************************************************************************/
 /**@{*/
-#define xtea_key_write(i, data)     neorv32_cfu_r4_instr(0b100 | i, data, 0, 0)
-#define xtea_key_read(i)            neorv32_cfu_r4_instr(0b000 | i, 0,    0, 0)
-#define xtea_hw_init(sum)           neorv32_cfu_r3_instr(0b0000000, 0b100, sum, 0 )
-#define xtea_hw_enc_v0_step(v0, v1) neorv32_cfu_r3_instr(0b0000000, 0b000, v0,  v1)
-#define xtea_hw_enc_v1_step(v0, v1) neorv32_cfu_r3_instr(0b0000000, 0b001, v0,  v1)
-#define xtea_hw_dec_v0_step(v0, v1) neorv32_cfu_r3_instr(0b0000000, 0b010, v0,  v1)
-#define xtea_hw_dec_v1_step(v0, v1) neorv32_cfu_r3_instr(0b0000000, 0b011, v0,  v1)
-#define xtea_hw_illegal_inst()      neorv32_cfu_r3_instr(0b0000000, 0b111, 0,   0 )
+#define xtea_key_write(i, k)        RISCV_INSTR_I_TYPE(RISCV_OPCODE_CUSTOM1, 0b001, k, i)
+#define xtea_key_read(i)            RISCV_INSTR_I_TYPE(RISCV_OPCODE_CUSTOM1, 0b000, 0, i)
+#define xtea_hw_init(s)             RISCV_INSTR_R_TYPE(RISCV_OPCODE_CUSTOM0, 0b100, 0b0000000, s,  0 )
+#define xtea_hw_enc_v0_step(v0, v1) RISCV_INSTR_R_TYPE(RISCV_OPCODE_CUSTOM0, 0b000, 0b0000000, v0, v1)
+#define xtea_hw_enc_v1_step(v0, v1) RISCV_INSTR_R_TYPE(RISCV_OPCODE_CUSTOM0, 0b001, 0b0000000, v0, v1)
+#define xtea_hw_dec_v0_step(v0, v1) RISCV_INSTR_R_TYPE(RISCV_OPCODE_CUSTOM0, 0b010, 0b0000000, v0, v1)
+#define xtea_hw_dec_v1_step(v0, v1) RISCV_INSTR_R_TYPE(RISCV_OPCODE_CUSTOM0, 0b011, 0b0000000, v0, v1)
+#define xtea_hw_illegal_inst()      RISCV_INSTR_R_TYPE(RISCV_OPCODE_CUSTOM0, 0b111, 0b0000000, 0,  0 )
 /**@}*/
 
 /*
- * The CFU custom instructions can be used as plain C functions as they are simple "intrinsics".
- * There are two "prototype primitives" for the CFU instructions (defined in sw/lib/include/neorv32_cfu.h):
+ * This is where the actual CFU instructions are defined. Based on the templates for generating custom
+ * RISC-V instructions, intrinsics are created that can be used just like regular C functions
+ * The instruction prototypes as well as the OPCODES available for the CFU are defined in
+ * "sw/lib/neorv32_intrinsics.h".
  *
- * > neorv32_cfu_r3_instr(funct7, funct3, rs1, rs2) - for r3-type instructions (custom-0 opcode)
- * > neorv32_cfu_r4_instr(funct3, rs1, rs2, rs3)    - for r4-type instructions (custom-1 opcode)
+ * So far, two RISC-V instruction formats are available: R-type instructions and I-type instructions.
  *
- * Each instance of these intrinsics is converted into a single 32-bit RISC-V instruction word
- * without any calling overhead at all.
+ * R-type instructions require 5 arguments:
+ * - opcode : The 7-bit OPCODE that identifies the instruction.
+ * - funct3 : A 3-bit immediate for function select.
+ * - funct7 : Another 7-bit immediate for function select.
+ * - rs1    : The 1st register source operand.
+ * - rs2    : The 2nd register source operand.
  *
- * The "rs*" source operands can be literals, variables, function return values, ... you name it.
- * The 7-bit immediate ("funct7") and the 3-bit immediate ("funct3") values can be used to pass
- * compile-time static literal data to the CFU or to do a fine-grained function selection.
+ * I-type instructions require 4 arguments:
+ * - opcode : The 7-bit OPCODE that identifies the instruction.
+ * - funct3 : A 3-bit immediate for function select.
+ * - rs1    : The 1st register source operand.
+ * - imm12  : A 12-bit immediate operand.
  *
- * Each "neorv32_cfu_r*" intrinsics returns a 32-bit data word of type uint32_t that represents
+ * Each instruction returns a 32-bit data word of type uint32_t that represents
  * the processing result of the according instruction.
  */
 
@@ -142,7 +148,7 @@ void xtea_sw_decipher(unsigned int num_cycles, uint32_t *v, const uint32_t k[4])
 /**********************************************************************//**
  * Main function: run pure-SW XTEA and compare with HW-accelerated XTEA
  *
- * @note This program requires UART0 and the Zxcfu and Zicntr ISA extension.
+ * @note This program requires UART0 and the Xcfu and Zicntr ISA extension.
  *
  * @return 0 if execution was successful
  **************************************************************************/
@@ -162,9 +168,9 @@ int main() {
   // setup UART0 at default baud rate, no interrupts
   neorv32_uart0_setup(BAUD_RATE, 0);
 
-  // check if the CFU is implemented (the CFU is wrapped in the core's "Zxcfu" ISA extension)
-  if (neorv32_cfu_available() == 0) {
-    neorv32_uart0_printf("ERROR! CFU ('Zxcfu' ISA extension) not implemented!\n");
+  // check if the CFU is implemented (the CFU is wrapped in the core's "Xcfu" ISA extension)
+  if ((neorv32_cpu_csr_read(CSR_MXISA) & (1 << CSR_MXISA_XCFU)) == 0) {
+    neorv32_uart0_printf("ERROR! CFU ('Xcfu' ISA extension) not implemented!\n");
     return -1;
   }
 
@@ -184,7 +190,7 @@ int main() {
   neorv32_uart0_printf("\n<<< NEORV32 Custom Functions Unit (CFU) - Custom Instructions Example >>>\n\n");
 
   neorv32_uart0_printf("[NOTE] This program assumes the default CFU hardware in\n"
-                       "       'rtl/core/neorv32_cpu_cp_cfu.vhd' that implements\n"
+                       "       rtl/core/neorv32_cpu_cp_cfu.vhd that implements\n"
                        "       the Extended Tiny Encryption Algorithm (XTEA).\n\n");
 
 
@@ -251,7 +257,7 @@ int main() {
   neorv32_uart0_printf("Comparing results... ");
   for (i=0; i<DATA_NUM; i++) {
     if (cypher_data_sw[i] != cypher_data_hw[i]) {
-      neorv32_uart0_printf("FAILED at byte %d\n", i);
+      neorv32_uart0_printf("FAILED at byte index %d\n", i);
       return -1;
     }
   }
@@ -299,7 +305,7 @@ int main() {
   neorv32_uart0_printf("Comparing results... ");
   for (i=0; i<DATA_NUM; i++) {
     if ((plain_data_sw[i] != plain_data_hw[i]) || (plain_data_sw[i] != input_data[i])) {
-      neorv32_uart0_printf("FAILED at byte %d\n", i);
+      neorv32_uart0_printf("FAILED at byte index %d\n", i);
       return -1;
     }
   }
@@ -319,7 +325,7 @@ int main() {
   // ----------------------------------------------------------
   // Execute an unimplemented CFU instruction word
   // ----------------------------------------------------------
-  neorv32_uart0_printf("\nExecuting non-implemented CFU instruction (raise ILLEGAL INSTRUCTION exception)...\n");
+  neorv32_uart0_printf("\nExecuting not-implemented CFU instruction (raise ILLEGAL INSTRUCTION exception)...\n");
   xtea_hw_illegal_inst();
 
 

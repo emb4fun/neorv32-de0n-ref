@@ -2,13 +2,13 @@
 -- NEORV32 - Processor Wrapper with AXI4 & AXI4-Stream Compatible Interfaces        --
 -- -------------------------------------------------------------------------------- --
 -- Dedicated for IP packaging/integration using AMD Vivado.                         --
--- Use the provided TCL script to automatically package this as IP module:          --
--- Vivado TCL console: > source neorv32_vivado_ip.tcl                               --
+-- Use the provided TCL script to automatically package this as IP module: navigate --
+-- to this file and run "source neorv32_vivado_ip.tcl" in the Vivado TCL console.   --
 -- See the NEORV32 Datasheet and User Guide for more information.                   --
 -- -------------------------------------------------------------------------------- --
 -- The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              --
 -- Copyright (c) NEORV32 contributors.                                              --
--- Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  --
+-- Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  --
 -- Licensed under the BSD-3-Clause license, see LICENSE for details.                --
 -- SPDX-License-Identifier: BSD-3-Clause                                            --
 -- ================================================================================ --
@@ -43,43 +43,51 @@ entity neorv32_vivado_ip is
     RISCV_ISA_U           : boolean                        := false;
     RISCV_ISA_Zaamo       : boolean                        := false;
     RISCV_ISA_Zalrsc      : boolean                        := false;
-    RISCV_ISA_Zcb         : boolean                        := false;
     RISCV_ISA_Zba         : boolean                        := false;
     RISCV_ISA_Zbb         : boolean                        := false;
+    RISCV_ISA_Zbc         : boolean                        := false;
     RISCV_ISA_Zbkb        : boolean                        := false;
     RISCV_ISA_Zbkc        : boolean                        := false;
     RISCV_ISA_Zbkx        : boolean                        := false;
     RISCV_ISA_Zbs         : boolean                        := false;
+    RISCV_ISA_Zcb         : boolean                        := false;
+    RISCV_ISA_Zcmop       : boolean                        := false;
     RISCV_ISA_Zfinx       : boolean                        := false;
+    RISCV_ISA_Zibi        : boolean                        := false;
     RISCV_ISA_Zicntr      : boolean                        := false;
     RISCV_ISA_Zicond      : boolean                        := false;
     RISCV_ISA_Zihpm       : boolean                        := false;
+    RISCV_ISA_Zimop       : boolean                        := false;
     RISCV_ISA_Zmmul       : boolean                        := false;
     RISCV_ISA_Zknd        : boolean                        := false;
     RISCV_ISA_Zkne        : boolean                        := false;
     RISCV_ISA_Zknh        : boolean                        := false;
     RISCV_ISA_Zksed       : boolean                        := false;
     RISCV_ISA_Zksh        : boolean                        := false;
-    RISCV_ISA_Zxcfu       : boolean                        := false;
+    RISCV_ISA_Smcntrpmf   : boolean                        := false;
+    RISCV_ISA_Xcfu        : boolean                        := false;
     -- Tuning Options --
     CPU_CONSTT_BR_EN      : boolean                        := false;
     CPU_FAST_MUL_EN       : boolean                        := false;
+    CPU_FAST_MUL_REG      : boolean                        := false;
     CPU_FAST_SHIFT_EN     : boolean                        := false;
-    CPU_RF_HW_RST_EN      : boolean                        := false;
+    CPU_RF_ARCH_SEL       : natural range 0 to 3           := 1; -- map to distributed RAM
     -- Physical Memory Protection (PMP) --
     PMP_NUM_REGIONS       : natural range 0 to 16          := 0;
     PMP_MIN_GRANULARITY   : natural                        := 4;
     PMP_TOR_MODE_EN       : boolean                        := false;
     PMP_NAP_MODE_EN       : boolean                        := false;
     -- Hardware Performance Monitors (HPM) --
-    HPM_NUM_CNTS          : natural range 0 to 13          := 0;
-    HPM_CNT_WIDTH         : natural range 0 to 64          := 40;
-    -- Internal Instruction memory --
+    HPM_NUM_CNTS          : natural range 0 to 29          := 0;
+    HPM_CNT_WIDTH         : natural range 0 to 64          := 64;
+    -- Internal Instruction Memory (IMEM) --
     IMEM_EN               : boolean                        := false;
+    IMEM_BASE             : std_ulogic_vector(31 downto 0) := x"00000000";
     IMEM_SIZE             : natural                        := 16384;
     IMEM_OUTREG_EN        : boolean                        := false;
-    -- Internal Data memory --
+    -- Internal Data MEmory (DMEM) --
     DMEM_EN               : boolean                        := false;
+    DMEM_BASE             : std_ulogic_vector(31 downto 0) := x"80000000";
     DMEM_SIZE             : natural                        := 8192;
     DMEM_OUTREG_EN        : boolean                        := false;
     -- CPU Caches --
@@ -87,50 +95,74 @@ entity neorv32_vivado_ip is
     ICACHE_NUM_BLOCKS     : natural range 1 to 4096        := 4;
     DCACHE_EN             : boolean                        := false;
     DCACHE_NUM_BLOCKS     : natural range 1 to 4096        := 4;
-    CACHE_BLOCK_SIZE      : natural range 8 to 1024        := 64;
+    CACHE_BLOCK_SIZE      : natural range 4 to 1024        := 64;
     CACHE_BURSTS_EN       : boolean                        := true;
-    -- External Bus Interface --
+    CACHE_UC_BASE         : std_ulogic_vector(31 downto 0) := x"F0000000";
+    -- Serial Memory Controller (SMC) --
+    SMC_EN                : boolean                        := false;
+    SMC_BASE              : std_ulogic_vector(31 downto 0) := x"E0000000";
+    -- External Bus Interface (XBUS) --
     XBUS_EN               : boolean                        := false;
     XBUS_TIMEOUT          : natural                        := 2048;
     XBUS_REGSTAGE_EN      : boolean                        := false;
-    -- Processor peripherals --
+    -- General-Purpose Input/Output Controller (GPIO) --
     IO_GPIO_EN            : boolean                        := false;
     IO_GPIO_IN_NUM        : natural range 1 to 32          := 1; -- variable-sized ports must be at least 0 downto 0; #974
     IO_GPIO_OUT_NUM       : natural range 1 to 32          := 1;
+    IO_GPIO_DIR_EN        : boolean                        := false;
+    IO_GPIO_DIR_NUM       : natural range 1 to 32          := 1;
+    -- RISC-V Core-Local Interruptor (CLINT) --
     IO_CLINT_EN           : boolean                        := false;
+    -- Universal Asynchronous Receiver/Transmitter (UART0/UART1) --
     IO_UART0_EN           : boolean                        := false;
     IO_UART0_RX_FIFO      : natural range 1 to 2**15       := 1;
     IO_UART0_TX_FIFO      : natural range 1 to 2**15       := 1;
     IO_UART1_EN           : boolean                        := false;
     IO_UART1_RX_FIFO      : natural range 1 to 2**15       := 1;
     IO_UART1_TX_FIFO      : natural range 1 to 2**15       := 1;
+    -- Serial Peripheral Interface (SPI Host, SDI Device) --
     IO_SPI_EN             : boolean                        := false;
     IO_SPI_FIFO           : natural range 1 to 2**15       := 1;
     IO_SDI_EN             : boolean                        := false;
     IO_SDI_FIFO           : natural range 1 to 2**15       := 1;
+    -- Two-Wire Interface (TWI Host, TWD Device) --
     IO_TWI_EN             : boolean                        := false;
     IO_TWI_FIFO           : natural range 1 to 2**15       := 1;
     IO_TWD_EN             : boolean                        := false;
     IO_TWD_RX_FIFO        : natural range 1 to 2**15       := 1;
     IO_TWD_TX_FIFO        : natural range 1 to 2**15       := 1;
+    -- Pulse-Width Modulation Controller (PWM) --
     IO_PWM_EN             : boolean                        := false;
-    IO_PWM_NUM_CH         : natural range 1 to 16          := 1; -- variable-sized ports must be at least 0 downto 0; #974
+    IO_PWM_NUM            : natural range 1 to 32          := 1; -- variable-sized ports must be at least 0 downto 0; #974
+    -- Watchdog Timer (WDT) --
     IO_WDT_EN             : boolean                        := false;
+    -- True-Random Number Generator (TRNG) --
     IO_TRNG_EN            : boolean                        := false;
     IO_TRNG_FIFO          : natural range 1 to 2**15       := 1;
+    IO_TRNG_NUM_RO        : natural range 1 to 255         := 3;
+    IO_TRNG_NUM_INV       : natural range 3 to 4095        := 5;
+    IO_TRNG_NUM_RBIT      : natural range 8 to 4096        := 64;
+    -- Custom Functions Subsystem (CFS) --
     IO_CFS_EN             : boolean                        := false;
+    -- Smart LED interface (NEOLED) --
     IO_NEOLED_EN          : boolean                        := false;
     IO_NEOLED_TX_FIFO     : natural range 1 to 2**15       := 1;
+    -- General-Purpose Timer (GPTMR) --
     IO_GPTMR_EN           : boolean                        := false;
+    IO_GPTMR_NUM          : natural range 1 to 16          := 1;
+    -- 1-Wire Interface (ONEWIRE) --
     IO_ONEWIRE_EN         : boolean                        := false;
+    -- Direct Memory Access Controller (DMA) --
     IO_DMA_EN             : boolean                        := false;
     IO_DMA_DSC_FIFO       : natural range 4 to 512         := 4;
+    -- Stream Link Interface (SLINK) --
     IO_SLINK_EN           : boolean                        := false;
     IO_SLINK_RX_FIFO      : natural range 1 to 2**15       := 1;
     IO_SLINK_TX_FIFO      : natural range 1 to 2**15       := 1;
+    -- Instruction Tracer (TRACER) --
     IO_TRACER_EN          : boolean                        := false;
-    IO_TRACER_BUFFER      : natural range 1 to 2**15       := 1
-
+    IO_TRACER_BUFFER      : natural range 1 to 2**15       := 1;
+    IO_TRACER_SIMLOG_EN   : boolean                        := false
   );
   port (
     -- ------------------------------------------------------------
@@ -205,9 +237,18 @@ entity neorv32_vivado_ip is
     jtag_tdo_o     : out std_logic := '0';
     jtag_tms_i     : in  std_logic := '0';
     -- ------------------------------------------------------------
+    -- Serial memory controller interface
+    -- ------------------------------------------------------------
+    smc_ioen_o     : out std_logic;
+    smc_sck_o      : out std_logic;
+    smc_csn_o      : out std_logic_vector(1 downto 0);
+    smc_sdo_o      : out std_logic;
+    smc_sdi_i      : in  std_logic := '0';
+    -- ------------------------------------------------------------
     -- Processor IO
     -- ------------------------------------------------------------
     -- GPIO (available if IO_GPIO_IN/OUT_NUM > 0) --
+    gpio_dir_o     : out std_logic_vector(IO_GPIO_DIR_NUM-1 downto 0); -- variable-sized ports must be at least 0 downto 0; #974
     gpio_o         : out std_logic_vector(IO_GPIO_OUT_NUM-1 downto 0); -- variable-sized ports must be at least 0 downto 0; #974
     gpio_i         : in  std_logic_vector(IO_GPIO_IN_NUM-1 downto 0) := (others => '0'); -- variable-sized ports must be at least 0 downto 0; #974
     -- primary UART0 (available if IO_UART0_EN = true) --
@@ -239,12 +280,11 @@ entity neorv32_vivado_ip is
     twd_sda_i      : in  std_logic := '0';
     twd_sda_o      : out std_logic;
     twd_scl_i      : in  std_logic := '0';
-    twd_scl_o      : out std_logic;
     -- 1-Wire Interface (available if IO_ONEWIRE_EN = true) --
     onewire_i      : in  std_logic := '0';
     onewire_o      : out std_logic;
-    -- PWM (available if IO_PWM_NUM_CH > 0) --
-    pwm_o          : out std_logic_vector(IO_PWM_NUM_CH-1 downto 0); -- variable-sized ports must be at least 0 downto 0; #974
+    -- PWM (available if IO_PWM_NUM > 0) --
+    pwm_o          : out std_logic_vector(IO_PWM_NUM-1 downto 0); -- variable-sized ports must be at least 0 downto 0; #974
     -- Custom Functions Subsystem IO (available if IO_CFS_EN = true) --
     cfs_in_i       : in  std_logic_vector(255 downto 0) := (others => '0');
     cfs_out_o      : out std_logic_vector(255 downto 0);
@@ -253,18 +293,20 @@ entity neorv32_vivado_ip is
     -- Machine timer system time (available if IO_CLINT_EN = true) --
     mtime_time_o   : out std_logic_vector(63 downto 0);
     -- CPU Interrupts --
-    mtime_irq_i    : in  std_logic := '0';
-    msw_irq_i      : in  std_logic := '0';
-    mext_irq_i     : in  std_logic := '0'
+    irq_msi_i      : in  std_logic := '0';
+    irq_mti_i      : in  std_logic := '0';
+    irq_mei_i      : in  std_logic := '0'
   );
 end entity;
 
 architecture neorv32_vivado_ip_rtl of neorv32_vivado_ip is
 
   -- auto-configuration --
-  constant num_gpio_c : natural := cond_sel_natural_f(IO_GPIO_EN, max_natural_f(IO_GPIO_IN_NUM, IO_GPIO_OUT_NUM), 0);
-  constant num_pwm_c  : natural := cond_sel_natural_f(IO_PWM_EN, IO_PWM_NUM_CH, 0);
-  constant burst_en_c : boolean := CACHE_BURSTS_EN and (ICACHE_EN or DCACHE_EN); -- any cache bursts?
+  constant num_pwm_c   : natural := sel_natural_f(IO_PWM_EN, IO_PWM_NUM, 0);
+  constant num_gptmr_c : natural := sel_natural_f(IO_GPTMR_EN, IO_GPTMR_NUM, 0);
+  constant burst_en_c  : boolean := CACHE_BURSTS_EN and (ICACHE_EN or DCACHE_EN); -- any cache bursts?
+  constant max_gpio_c  : natural := sel_natural_f(boolean(IO_GPIO_IN_NUM > IO_GPIO_OUT_NUM), IO_GPIO_IN_NUM, IO_GPIO_OUT_NUM);
+  constant num_gpio_c  : natural := sel_natural_f(IO_GPIO_EN, max_gpio_c, 0);
 
   -- AXI4 bridge --
   component xbus2axi4_bridge
@@ -335,16 +377,16 @@ architecture neorv32_vivado_ip_rtl of neorv32_vivado_ip is
   signal spi_csn_aux : std_ulogic_vector(7 downto 0);
   signal sdi_do_aux : std_ulogic;
   signal twi_sda_o_aux, twi_scl_o_aux : std_ulogic;
-  signal twd_sda_o_aux, twd_scl_o_aux : std_ulogic;
+  signal twd_sda_o_aux : std_ulogic;
   signal onewire_o_aux : std_ulogic;
   signal cfs_out_aux : std_ulogic_vector(255 downto 0);
   signal neoled_aux : std_ulogic;
   signal mtime_time_aux : std_ulogic_vector(63 downto 0);
+  signal smc_ioen_aux, smc_sck_aux, smc_sdo_aux : std_ulogic;
+  signal smc_csn_aux : std_ulogic_vector(1 downto 0);
 
-  -- constrained size ports --
-  signal gpio_o_aux : std_ulogic_vector(31 downto 0);
-  signal gpio_i_aux : std_ulogic_vector(31 downto 0);
-  signal pwm_o_aux  : std_ulogic_vector(15 downto 0);
+  -- constrained-size ports --
+  signal gpio_dir_o_aux, gpio_o_aux, gpio_i_aux, pwm_o_aux : std_ulogic_vector(31 downto 0);
 
   -- internal xbus --
   signal xbus_req : xbus_req_t;
@@ -374,29 +416,35 @@ begin
     RISCV_ISA_U         => RISCV_ISA_U,
     RISCV_ISA_Zaamo     => RISCV_ISA_Zaamo,
     RISCV_ISA_Zalrsc    => RISCV_ISA_Zalrsc,
-    RISCV_ISA_Zcb       => RISCV_ISA_Zcb,
     RISCV_ISA_Zba       => RISCV_ISA_Zba,
     RISCV_ISA_Zbb       => RISCV_ISA_Zbb,
+    RISCV_ISA_Zbc       => RISCV_ISA_Zbc,
     RISCV_ISA_Zbkb      => RISCV_ISA_Zbkb,
     RISCV_ISA_Zbkc      => RISCV_ISA_Zbkc,
     RISCV_ISA_Zbkx      => RISCV_ISA_Zbkx,
     RISCV_ISA_Zbs       => RISCV_ISA_Zbs,
+    RISCV_ISA_Zcb       => RISCV_ISA_Zcb,
+    RISCV_ISA_Zcmop     => RISCV_ISA_Zcmop,
     RISCV_ISA_Zfinx     => RISCV_ISA_Zfinx,
+    RISCV_ISA_Zibi      => RISCV_ISA_Zibi,
     RISCV_ISA_Zicntr    => RISCV_ISA_Zicntr,
     RISCV_ISA_Zicond    => RISCV_ISA_Zicond,
     RISCV_ISA_Zihpm     => RISCV_ISA_Zihpm,
+    RISCV_ISA_Zimop     => RISCV_ISA_Zimop,
     RISCV_ISA_Zmmul     => RISCV_ISA_Zmmul,
     RISCV_ISA_Zknd      => RISCV_ISA_Zknd,
     RISCV_ISA_Zkne      => RISCV_ISA_Zkne,
     RISCV_ISA_Zknh      => RISCV_ISA_Zknh,
     RISCV_ISA_Zksed     => RISCV_ISA_Zksed,
     RISCV_ISA_Zksh      => RISCV_ISA_Zksh,
-    RISCV_ISA_Zxcfu     => RISCV_ISA_Zxcfu,
+    RISCV_ISA_Smcntrpmf => RISCV_ISA_Smcntrpmf,
+    RISCV_ISA_Xcfu      => RISCV_ISA_Xcfu,
     -- Extension Options --
     CPU_CONSTT_BR_EN    => CPU_CONSTT_BR_EN,
     CPU_FAST_MUL_EN     => CPU_FAST_MUL_EN,
+    CPU_FAST_MUL_REG    => CPU_FAST_MUL_REG,
     CPU_FAST_SHIFT_EN   => CPU_FAST_SHIFT_EN,
-    CPU_RF_HW_RST_EN    => CPU_RF_HW_RST_EN,
+    CPU_RF_ARCH_SEL     => CPU_RF_ARCH_SEL,
     -- Physical Memory Protection --
     PMP_NUM_REGIONS     => PMP_NUM_REGIONS,
     PMP_MIN_GRANULARITY => PMP_MIN_GRANULARITY,
@@ -407,10 +455,12 @@ begin
     HPM_CNT_WIDTH       => HPM_CNT_WIDTH,
     -- Internal Instruction memory --
     IMEM_EN             => IMEM_EN,
+    IMEM_BASE           => IMEM_BASE,
     IMEM_SIZE           => IMEM_SIZE,
     IMEM_OUTREG_EN      => IMEM_OUTREG_EN,
     -- Internal Data memory --
     DMEM_EN             => DMEM_EN,
+    DMEM_BASE           => DMEM_BASE,
     DMEM_SIZE           => DMEM_SIZE,
     DMEM_OUTREG_EN      => DMEM_OUTREG_EN,
     -- CPU Caches --
@@ -420,45 +470,66 @@ begin
     DCACHE_NUM_BLOCKS   => DCACHE_NUM_BLOCKS,
     CACHE_BLOCK_SIZE    => CACHE_BLOCK_SIZE,
     CACHE_BURSTS_EN     => burst_en_c,
-    -- External bus interface --
+    -- Serial Memory Controller (SMC) --
+    SMC_EN              => SMC_EN,
+    SMC_BASE            => SMC_BASE,
+    -- External Bus Interface (XBUS) --
     XBUS_EN             => XBUS_EN,
     XBUS_TIMEOUT        => XBUS_TIMEOUT,
     XBUS_REGSTAGE_EN    => XBUS_REGSTAGE_EN,
-    -- Processor peripherals --
-    IO_DISABLE_SYSINFO  => false,
+    -- General-Purpose Input/Output Controller --
     IO_GPIO_NUM         => num_gpio_c,
+    IO_GPIO_DIR_EN      => IO_GPIO_DIR_EN,
+    -- RISC-V Core-Local Interruptor --
     IO_CLINT_EN         => IO_CLINT_EN,
     IO_UART0_EN         => IO_UART0_EN,
+    -- Universal Asynchronous Receiver/Transmitter --
     IO_UART0_RX_FIFO    => IO_UART0_RX_FIFO,
     IO_UART0_TX_FIFO    => IO_UART0_TX_FIFO,
     IO_UART1_EN         => IO_UART1_EN,
     IO_UART1_RX_FIFO    => IO_UART1_RX_FIFO,
     IO_UART1_TX_FIFO    => IO_UART1_TX_FIFO,
+    -- Serial Peripheral Interface (Host / Device) --
     IO_SPI_EN           => IO_SPI_EN,
     IO_SPI_FIFO         => IO_SPI_FIFO,
     IO_SDI_EN           => IO_SDI_EN,
     IO_SDI_FIFO         => IO_SDI_FIFO,
+    -- Two-Wire Interface (Host / Device) --
     IO_TWI_EN           => IO_TWI_EN,
     IO_TWI_FIFO         => IO_TWI_FIFO,
     IO_TWD_EN           => IO_TWD_EN,
     IO_TWD_RX_FIFO      => IO_TWD_RX_FIFO,
     IO_TWD_TX_FIFO      => IO_TWD_TX_FIFO,
-    IO_PWM_NUM_CH       => num_pwm_c,
+    -- Pulse-Width Modulation Controller --
+    IO_PWM_NUM          => num_pwm_c,
+    -- Watchdog Timer --
     IO_WDT_EN           => IO_WDT_EN,
+    -- True-Random Number Generator --
     IO_TRNG_EN          => IO_TRNG_EN,
     IO_TRNG_FIFO        => IO_TRNG_FIFO,
+    IO_TRNG_NUM_RO      => IO_TRNG_NUM_RO,
+    IO_TRNG_NUM_INV     => IO_TRNG_NUM_INV,
+    IO_TRNG_NUM_RBIT    => IO_TRNG_NUM_RBIT,
+    -- Custom Functions Subsystem --
     IO_CFS_EN           => IO_CFS_EN,
+    -- Smart LED interface --
     IO_NEOLED_EN        => IO_NEOLED_EN,
     IO_NEOLED_TX_FIFO   => IO_NEOLED_TX_FIFO,
-    IO_GPTMR_EN         => IO_GPTMR_EN,
+    -- General-Purpose Timer --
+    IO_GPTMR_NUM        => num_gptmr_c,
+    -- 1-Wire Interface --
     IO_ONEWIRE_EN       => IO_ONEWIRE_EN,
+    -- Direct Memory Access Controller --
     IO_DMA_EN           => IO_DMA_EN,
     IO_DMA_DSC_FIFO     => IO_DMA_DSC_FIFO,
+    -- Stream Link Interface --
     IO_SLINK_EN         => IO_SLINK_EN,
     IO_SLINK_RX_FIFO    => IO_SLINK_RX_FIFO,
     IO_SLINK_TX_FIFO    => IO_SLINK_TX_FIFO,
+    -- Instruction Tracer --
     IO_TRACER_EN        => IO_TRACER_EN,
-    IO_TRACER_BUFFER    => IO_TRACER_BUFFER
+    IO_TRACER_BUFFER    => IO_TRACER_BUFFER,
+    IO_TRACER_SIMLOG_EN => IO_TRACER_SIMLOG_EN
   )
   port map (
     -- Global control --
@@ -471,6 +542,12 @@ begin
     jtag_tdi_i     => std_ulogic(jtag_tdi_i),
     jtag_tdo_o     => jtag_tdo_aux,
     jtag_tms_i     => std_ulogic(jtag_tms_i),
+    -- Serial memory controller interface (available if SMC_EN = true) --
+    smc_ioen_o     => smc_ioen_aux,
+    smc_sck_o      => smc_sck_aux,
+    smc_csn_o      => smc_csn_aux,
+    smc_sdo_o      => smc_sdo_aux,
+    smc_sdi_i      => std_ulogic(smc_sdi_i),
     -- External bus interface (available if XBUS_EN = true) --
     xbus_adr_o     => xbus_req.addr,
     xbus_dat_o     => xbus_req.data,
@@ -495,6 +572,7 @@ begin
     slink_tx_lst_o => s0_axis_tlast_aux,
     slink_tx_rdy_i => std_ulogic(s0_axis_tready),
     -- GPIO (available if IO_GPIO_NUM > 0) --
+    gpio_dir_o     => gpio_dir_o_aux,
     gpio_o         => gpio_o_aux,
     gpio_i         => gpio_i_aux,
     -- primary UART0 (available if IO_UART0_EN = true) --
@@ -526,11 +604,10 @@ begin
     twd_sda_i      => std_ulogic(twd_sda_i),
     twd_sda_o      => twd_sda_o_aux,
     twd_scl_i      => std_ulogic(twd_scl_i),
-    twd_scl_o      => twd_scl_o_aux,
     -- 1-Wire Interface (available if IO_ONEWIRE_EN = true) --
     onewire_i      => std_ulogic(onewire_i),
     onewire_o      => onewire_o_aux,
-    -- PWM available if IO_PWM_NUM_CH > 0) --
+    -- PWM available if IO_PWM_NUM > 0) --
     pwm_o          => pwm_o_aux,
     -- Custom Functions Subsystem IO (available if IO_CFS_EN = true) --
     cfs_in_i       => std_ulogic_vector(cfs_in_i),
@@ -540,9 +617,9 @@ begin
     -- Machine timer system time (available if IO_MTIME_EN = true) --
     mtime_time_o   => mtime_time_aux,
     -- CPU Interrupts --
-    mtime_irq_i    => std_ulogic(mtime_irq_i),
-    msw_irq_i      => std_ulogic(msw_irq_i),
-    mext_irq_i     => std_ulogic(mext_irq_i)
+    irq_msi_i      => std_ulogic(irq_msi_i),
+    irq_mti_i      => std_ulogic(irq_mti_i),
+    irq_mei_i      => std_ulogic(irq_mei_i)
   );
 
 
@@ -575,7 +652,6 @@ begin
   twi_scl_o <= std_logic(twi_scl_o_aux);
 
   twd_sda_o <= std_logic(twd_sda_o_aux);
-  twd_scl_o <= std_logic(twd_scl_o_aux);
 
   onewire_o <= std_logic(onewire_o_aux);
 
@@ -585,8 +661,13 @@ begin
 
   mtime_time_o <= std_logic_vector(mtime_time_aux);
 
+  smc_ioen_o <= std_logic(smc_ioen_aux);
+  smc_sck_o  <= std_logic(smc_sck_aux);
+  smc_csn_o  <= std_logic_vector(smc_csn_aux);
+  smc_sdo_o  <= std_logic(smc_sdo_aux);
 
-  -- Type Conversion (Constrained-Size Ports) -----------------------------------------------
+
+  -- Mapping for Constrained-Size Ports -----------------------------------------------------
   -- -------------------------------------------------------------------------------------------
 
   -- GPIO input --
@@ -596,7 +677,7 @@ begin
     for i in 0 to IO_GPIO_IN_NUM-1 loop
       gpio_i_aux(i) <= std_ulogic(gpio_i(i));
     end loop;
-  end process gpio_in_mapping;
+  end process;
 
   -- GPIO output --
   gpio_out_mapping:
@@ -604,9 +685,15 @@ begin
     gpio_o(i) <= std_logic(gpio_o_aux(i));
   end generate;
 
+  -- GPIO direction --
+  gpio_dir_mapping:
+  for i in 0 to IO_GPIO_DIR_NUM-1 generate
+    gpio_dir_o(i) <= std_logic(gpio_dir_o_aux(i));
+  end generate;
+
   -- PWM --
   pwm_mapping:
-  for i in 0 to IO_PWM_NUM_CH-1 generate
+  for i in 0 to IO_PWM_NUM-1 generate
     pwm_o(i) <= std_logic(pwm_o_aux(i));
   end generate;
 
@@ -672,4 +759,4 @@ begin
     );
   end generate;
 
-end architecture neorv32_vivado_ip_rtl;
+end architecture;

@@ -1,7 +1,7 @@
 // ================================================================================ //
 // The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              //
 // Copyright (c) NEORV32 contributors.                                              //
-// Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  //
+// Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  //
 // Licensed under the BSD-3-Clause license, see LICENSE for details.                //
 // SPDX-License-Identifier: BSD-3-Clause                                            //
 // ================================================================================ //
@@ -14,8 +14,8 @@
 #ifndef NEORV32_TRACER_H
 #define NEORV32_TRACER_H
 
+#include <neorv32.h>
 #include <stdint.h>
-
 
 /**********************************************************************//**
  * @name IO Device: Execution tracer (TRACER)
@@ -67,14 +67,14 @@ uint32_t neorv32_tracer_data_get_dst(void);
  * Start tracing.
  **************************************************************************/
 inline void __attribute__ ((always_inline)) neorv32_tracer_start(void) {
-  NEORV32_TRACER->CTRL |= (1 << TRACER_CTRL_START);
+  __MMREG32_BSET(NEORV32_TRACER->CTRL, 1 << TRACER_CTRL_START);
 }
 
 /**********************************************************************//**
  * Stop tracing.
  **************************************************************************/
 inline void __attribute__ ((always_inline)) neorv32_tracer_stop(void) {
-  NEORV32_TRACER->CTRL |= (1 << TRACER_CTRL_STOP);
+  __MMREG32_BSET(NEORV32_TRACER->CTRL, 11 << TRACER_CTRL_STOP);
 }
 
 #endif // NEORV32_TRACER_H

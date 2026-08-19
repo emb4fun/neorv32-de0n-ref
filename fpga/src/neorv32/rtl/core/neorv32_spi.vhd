@@ -3,7 +3,7 @@
 -- -------------------------------------------------------------------------------- --
 -- The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              --
 -- Copyright (c) NEORV32 contributors.                                              --
--- Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  --
+-- Copyright (c) 2020 - 2026 Stephan Nolting. All rights reserved.                  --
 -- Licensed under the BSD-3-Clause license, see LICENSE for details.                --
 -- SPDX-License-Identifier: BSD-3-Clause                                            --
 -- ================================================================================ --
@@ -24,14 +24,14 @@ entity neorv32_spi is
     rstn_i    : in  std_ulogic;                    -- global reset line, low-active, async
     bus_req_i : in  bus_req_t;                     -- bus request
     bus_rsp_o : out bus_rsp_t;                     -- bus response
-    clkgen_i  : in  std_ulogic_vector(7 downto 0); -- pre-scaled clocks
+    clkgen_i  : in  std_ulogic_vector(7 downto 0); -- prescaled clock enables
     spi_clk_o : out std_ulogic;                    -- serial clock
     spi_dat_o : out std_ulogic;                    -- controller data out, peripheral data in
     spi_dat_i : in  std_ulogic;                    -- controller data in, peripheral data out
     spi_csn_o : out std_ulogic_vector(7 downto 0); -- chip-select, low-active
     irq_o     : out std_ulogic                     -- CPU interrupt
   );
-end neorv32_spi;
+end entity;
 
 architecture neorv32_spi_rtl of neorv32_spi is
 
@@ -74,7 +74,6 @@ architecture neorv32_spi_rtl of neorv32_spi is
   -- SPI engine --
   type rtx_engine_t is record
     state    : std_ulogic_vector(2 downto 0);
-    busy     : std_ulogic;
     sreg     : std_ulogic_vector(7 downto 0);
     bitcnt   : std_ulogic_vector(3 downto 0);
     sdi_sync : std_ulogic;
@@ -83,21 +82,24 @@ architecture neorv32_spi_rtl of neorv32_spi is
     done     : std_ulogic;
   end record;
   signal rtx_engine : rtx_engine_t;
+  signal busy : std_ulogic;
 
-  -- FIFO interfaces --
+  -- RX FIFO interface --
   type tx_fifo_t is record
     we,    re    : std_ulogic;
     wdata, rdata : std_ulogic_vector(8 downto 0);
     avail, free  : std_ulogic;
     clear        : std_ulogic;
   end record;
+  signal tx_fifo : tx_fifo_t;
+
+  -- TX FIFO interface --
   type rx_fifo_t is record
     we,    re    : std_ulogic;
     wdata, rdata : std_ulogic_vector(7 downto 0);
     avail, free  : std_ulogic;
     clear        : std_ulogic;
   end record;
-  signal tx_fifo : tx_fifo_t;
   signal rx_fifo : rx_fifo_t;
 
 begin
@@ -141,14 +143,14 @@ begin
             bus_rsp_o.data(ctrl_tx_full_c)                   <= not tx_fifo.free;
             bus_rsp_o.data(ctrl_fifo3_c downto ctrl_fifo0_c) <= std_ulogic_vector(to_unsigned(log2_fifo_size_c, 4));
             bus_rsp_o.data(ctrl_cs_en_c)                     <= rtx_engine.cs_ctrl(3);
-            bus_rsp_o.data(ctrl_busy_c)                      <= rtx_engine.busy or tx_fifo.avail;
+            bus_rsp_o.data(ctrl_busy_c)                      <= busy or tx_fifo.avail;
           else -- RX data
             bus_rsp_o.data(7 downto 0) <= rx_fifo.rdata;
           end if;
         end if;
       end if;
     end if;
-  end process bus_access;
+  end process;
 
 
   -- Data FIFO ("Ring Buffer") --------------------------------------------------------------
@@ -211,14 +213,12 @@ begin
 
 
   -- IRQ generator: IRQ if TX FIFO is empty and serial engine is idle --
-  irq_generator: process(rstn_i, clk_i)
+  irq_generator: process(clk_i)
   begin
-    if (rstn_i = '0') then
-      irq_o <= '0';
-    elsif rising_edge(clk_i) then
-      irq_o <= ctrl.enable and (not tx_fifo.avail) and (not rtx_engine.busy);
+    if rising_edge(clk_i) then
+      irq_o <= ctrl.enable and (not tx_fifo.avail) and (not busy);
     end if;
-  end process irq_generator;
+  end process;
 
 
   -- SPI Transceiver ------------------------------------------------------------------------
@@ -226,13 +226,13 @@ begin
   transceiver: process(rstn_i, clk_i)
   begin
     if (rstn_i = '0') then
-      rtx_engine.done     <= '0';
       rtx_engine.state    <= (others => '0');
-      rtx_engine.bitcnt   <= (others => '0');
       rtx_engine.sreg     <= (others => '0');
+      rtx_engine.bitcnt   <= (others => '0');
       rtx_engine.sdi_sync <= '0';
       rtx_engine.sck      <= '0';
       rtx_engine.cs_ctrl  <= (others => '0');
+      rtx_engine.done     <= '0';
     elsif rising_edge(clk_i) then
       rtx_engine.done     <= '0';
       rtx_engine.state(2) <= ctrl.enable;
@@ -291,10 +291,10 @@ begin
 
       end case;
     end if;
-  end process transceiver;
+  end process;
 
   -- PHY busy flag --
-  rtx_engine.busy <= '0' when (rtx_engine.state(1 downto 0) = "00") else '1';
+  busy <= '0' when (rtx_engine.state(1 downto 0) = "00") else '1';
 
   -- SPI output --
   spi_dat_o <= rtx_engine.sreg(7); -- MSB first
@@ -311,17 +311,14 @@ begin
         spi_csn_o(to_integer(unsigned(rtx_engine.cs_ctrl(2 downto 0)))) <= '0';
       end if;
     end if;
-  end process chip_select;
+  end process;
 
 
   -- SPI Clock Generator --------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  clock_generator: process(rstn_i, clk_i)
+  clock_generator: process(clk_i)
   begin
-    if (rstn_i = '0') then
-      spi_clk_en <= '0';
-      cdiv_cnt   <= (others => '0');
-    elsif rising_edge(clk_i) then
+    if rising_edge(clk_i) then
       spi_clk_en <= '0'; -- default
       if (ctrl.enable = '0') then -- reset/disabled
         cdiv_cnt <= (others => '0');
@@ -334,7 +331,6 @@ begin
         end if;
       end if;
     end if;
-  end process clock_generator;
+  end process;
 
-
-end neorv32_spi_rtl;
+end architecture;
